@@ -31,6 +31,8 @@ concurrency:
 
 jobs:
   check:
+    # En el repositorio plantilla no se ejecuta nada; en las copias ("Use this template" o fork) sí.
+    if: github.repository != 'Manuel-delablanca/OffersFinder_Public'
     runs-on: ubuntu-latest
     env:
       # Fuente de precios: Google Shopping (España) a través de Serper.dev.
