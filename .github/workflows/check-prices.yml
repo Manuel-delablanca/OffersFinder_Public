@@ -1,0 +1,125 @@
+name: Comprobar precios
+
+on:
+  schedule:
+    # Una vez al día a las 09:05 hora de España. GitHub programa en UTC y España cambia de horario
+    # en verano, así que se dispara a las 07:05 y 08:05 UTC y el paso "Comprobar hora local" deja
+    # pasar solo el disparo en el que en Madrid son las 9.
+    - cron: "5 7 * * *"
+    - cron: "5 8 * * *"
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: "Guardar el HTML de cada tienda como artefacto (diagnóstico)"
+        type: boolean
+        default: false
+      test_notify:
+        description: "Solo enviar un aviso de prueba a Telegram (sin comprobar precios)"
+        type: boolean
+        default: false
+      force_api:
+        description: "Llamar a la API de búsqueda en esta ejecución aunque esté en pausa (gasta consultas)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: check-prices
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      # Fuente de precios: Google Shopping (España) a través de Serper.dev.
+      # Sin esta clave se consulta a cada tienda, pero casi todas bloquean el acceso automático.
+      SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
+      SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
+      # Variable de repositorio API_PAUSE_UNTIL (AAAA-MM-DD): hasta esa fecha no se llama a la API y solo se
+      # leen las fichas de producto (urls). En una ejecución manual con 'force_api' se ignora la pausa.
+      API_PAUSE_UNTIL: ${{ inputs.force_api && 'none' || vars.API_PAUSE_UNTIL }}
+      # Avisos por Telegram: secretos TELEGRAM_BOT_TOKEN (token de @BotFather) y TELEGRAM_CHAT_ID
+      # (lo muestra el comando 'telegram-setup'; también vale como variable de repositorio).
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID || vars.TELEGRAM_CHAT_ID }}
+      # Opcionales: email y WhatsApp (desactivados si los secretos no existen)
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+      EMAIL_TO: ${{ secrets.EMAIL_TO }}
+      WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
+      WHATSAPP_APIKEY: ${{ secrets.WHATSAPP_APIKEY }}
+      MIN_DROP_PERCENT: ${{ vars.MIN_DROP_PERCENT }}
+      # Pon la variable de repositorio WEB_SEARCH a "false" para ahorrar consultas (solo Google Shopping)
+      WEB_SEARCH: ${{ vars.WEB_SEARCH }}
+      DEBUG_DIR: ${{ inputs.debug && 'debug-html' || '' }}
+    steps:
+      - name: Comprobar hora local
+        id: hora
+        run: |
+          hora=$(TZ=Europe/Madrid date +%H)
+          echo "fecha=$(TZ=Europe/Madrid date +%F)" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$hora" = "09" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "Hora en Madrid: ${hora}:$(TZ=Europe/Madrid date +%M). Se ejecuta la comprobación."
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Hora en Madrid: ${hora}:$(TZ=Europe/Madrid date +%M). No son las 9; este disparo se omite."
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.hora.outputs.run == 'true'
+
+      - uses: actions/setup-dotnet@v4
+        if: steps.hora.outputs.run == 'true'
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Aviso de prueba
+        if: ${{ inputs.test_notify && steps.hora.outputs.run == 'true' }}
+        run: dotnet run --project src/OffersFinder -c Release -- test-notify
+
+      - name: Comprobar precios
+        if: ${{ !inputs.test_notify && steps.hora.outputs.run == 'true' }}
+        run: dotnet run --project src/OffersFinder -c Release -- check
+
+      - name: Diagnóstico de tiendas
+        if: ${{ inputs.debug && !inputs.test_notify && steps.hora.outputs.run == 'true' }}
+        run: dotnet run --project src/OffersFinder -c Release --no-build -- diagnose
+
+      - name: Subir HTML de diagnóstico
+        if: ${{ inputs.debug && !inputs.test_notify && steps.hora.outputs.run == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-html
+          path: debug-html/
+          retention-days: 3
+          if-no-files-found: ignore
+
+      - name: Recordatorio programado
+        # Se envía una sola vez, en la ejecución programada del día indicado en la variable de repositorio
+        # REMINDER_DATE (AAAA-MM-DD). Sin esa variable no se envía nada.
+        if: ${{ github.event_name == 'schedule' && steps.hora.outputs.run == 'true' && vars.REMINDER_DATE != '' && steps.hora.outputs.fecha == vars.REMINDER_DATE }}
+        run: >
+          dotnet run --project src/OffersFinder -c Release --no-build -- notify
+          "⏰ Recordatorio de OffersFinder"
+          "${REMINDER_TEXT:-Hoy es la fecha que marcaste como recordatorio.} La API de búsqueda ${API_PAUSE_UNTIL:+está en pausa hasta el $API_PAUSE_UNTIL y se reactivará sola ese día.}\n\nPara reactivarla antes (o retrasarla), en GitHub ve a Settings → Secrets and variables → Actions → Variables y edita API_PAUSE_UNTIL: 'none' para activarla ya, o una fecha AAAA-MM-DD.\n\nCada producto gasta 2 consultas de la API por comprobación (Shopping + web)."
+        env:
+          REMINDER_TEXT: ${{ vars.REMINDER_TEXT }}
+
+      - name: Guardar histórico e informe
+        if: ${{ !inputs.test_notify && steps.hora.outputs.run == 'true' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/history.json data/report.html
+          if git diff --cached --quiet; then
+            echo "Sin cambios en el histórico."
+          else
+            git commit -m "chore: actualizar histórico de precios [skip ci]"
+            git push
+          fi

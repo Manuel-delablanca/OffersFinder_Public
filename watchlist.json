@@ -1,0 +1,60 @@
+{
+  "blacklistedStores": [
+    "wallapop",
+    "milanuncios",
+    "ebay",
+    "cashconvertersespana",
+    "cex",
+    "refurbedes",
+    "madeinchinacom",
+    "ubuycomes",
+    "onbuycom"
+  ],
+  "items": [
+    {
+      "name": "Ejemplo: SSD Samsung 990 Pro 2TB",
+      "query": "Samsung 990 Pro 2TB",
+      "mustContain": [
+        "990",
+        "pro",
+        "2tb"
+      ],
+      "exclude": [
+        "disipador",
+        "heatsink",
+        "4tb",
+        "1tb",
+        "evo"
+      ],
+      "minPrice": 100,
+      "maxPrice": 300,
+      "targetPrice": 150
+    },
+    {
+      "name": "Ejemplo: Nintendo Switch OLED (solo recogida en Madrid)",
+      "query": "Nintendo Switch OLED",
+      "exclude": [
+        "funda",
+        "mando",
+        "cristal",
+        "protector",
+        "cable",
+        "base",
+        "renovado",
+        "reacondicionado"
+      ],
+      "minPrice": 250,
+      "maxPrice": 400,
+      "pickupMadridOnly": true,
+      "targetPrice": 300
+    },
+    {
+      "name": "Ejemplo: ficha de producto concreta (sin gastar consultas)",
+      "url": "https://tienda.ejemplo/producto-123",
+      "urls": [
+        "https://otra-tienda.ejemplo/producto-123"
+      ],
+      "targetPrice": 99.99
+    }
+  ]
+}

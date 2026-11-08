@@ -1,0 +1,201 @@
+{
+  "//": "Catálogo de tiendas. 'shipsToSpain' y 'pickupMadrid' describen cada tienda; 'aliases' son los nombres con los que aparece en Google Shopping. Con SERPER_API_KEY las búsquedas usan Google Shopping y el catálogo solo aporta la recogida en Madrid y las listas negras; sin clave, se consulta a cada tienda con 'searchUrl' y 'selectors' (muchas bloquean el acceso automático).",
+  "stores": [
+    {
+      "id": "amazon_es",
+      "name": "Amazon.es",
+      "searchUrl": "https://www.amazon.es/s?k={query}",
+      "shipsToSpain": true,
+      "pickupMadrid": true,
+      "pickupNote": "Recogida en Amazon Lockers y puntos Celeritas/Correos por toda la Comunidad de Madrid.",
+      "notes": "Amazon bloquea bots con frecuencia (HTTP 503/captcha). Si falla, usa URLs de producto concretas.",
+      "selectors": {
+        "result": "div[data-component-type='s-search-result']",
+        "title": "h2 span",
+        "price": "span.a-price span.a-offscreen",
+        "link": "h2 a, a.a-link-normal.s-no-outline"
+      },
+      "aliases": [
+        "Amazon.es",
+        "Amazon"
+      ]
+    },
+    {
+      "id": "pccomponentes",
+      "name": "PcComponentes",
+      "searchUrl": "https://www.pccomponentes.com/buscar/?query={query}",
+      "shipsToSpain": true,
+      "pickupMadrid": true,
+      "pickupNote": "Tienda física en Alcobendas (Madrid) y puntos de recogida.",
+      "selectors": {
+        "result": "[data-testid='product-card'], article.product-card, div.product-card",
+        "title": "h3, [data-testid='product-card-title'], .product-card__title",
+        "price": "[data-e2e='price-card'], .product-card__price, [class*='price']",
+        "link": "a[href]"
+      },
+      "aliases": [
+        "PcComponentes",
+        "PC Componentes"
+      ]
+    },
+    {
+      "id": "mediamarkt",
+      "name": "MediaMarkt",
+      "searchUrl": "https://www.mediamarkt.es/es/search.html?query={query}",
+      "shipsToSpain": true,
+      "pickupMadrid": true,
+      "pickupNote": "Recogida gratuita en tiendas de Madrid (Castellana, Plenilunio, Alcorcón, Majadahonda, etc.).",
+      "selectors": {
+        "result": "[data-test='mms-product-card'], [data-test='mms-search-srp-productlist-item']",
+        "title": "[data-test='product-title'], h2, h3",
+        "price": "[data-test='branded-price-whole-value'], [data-test='mms-price'], [class*='price']",
+        "link": "a[href]"
+      },
+      "aliases": [
+        "MediaMarkt",
+        "Media Markt"
+      ]
+    },
+    {
+      "id": "elcorteingles",
+      "name": "El Corte Inglés",
+      "searchUrl": "https://www.elcorteingles.es/search-nwx/?s={query}",
+      "shipsToSpain": true,
+      "pickupMadrid": true,
+      "pickupNote": "Click & Collect en cualquier centro de Madrid (Castellana, Preciados, Sanchinarro, Pozuelo...).",
+      "selectors": {
+        "result": "li.products_list-item, .product_tile, [class*='product-tile']",
+        "title": ".product_tile-description, [class*='product-title'], h2, h3",
+        "price": ".price._big, .prices-price._sale, .prices-price, [class*='price']",
+        "link": "a[href]"
+      },
+      "aliases": [
+        "El Corte Inglés",
+        "El Corte Ingles"
+      ]
+    },
+    {
+      "id": "fnac",
+      "name": "Fnac",
+      "searchUrl": "https://www.fnac.es/SearchResult/ResultList.aspx?Search={query}",
+      "shipsToSpain": true,
+      "pickupMadrid": true,
+      "pickupNote": "Recogida en Fnac Callao, Castellana, La Gavia, Parquesur, Xanadú...",
+      "selectors": {
+        "result": "article.Article-item, .Article-itemGroup article",
+        "title": ".Article-title, .Article-desc a",
+        "price": ".userPrice, .price, [class*='Price']",
+        "link": "a.Article-title, a[href]"
+      },
+      "aliases": [
+        "Fnac",
+        "Fnac.es"
+      ]
+    },
+    {
+      "id": "carrefour",
+      "name": "Carrefour",
+      "searchUrl": "https://www.carrefour.es/?q={query}",
+      "shipsToSpain": true,
+      "pickupMadrid": true,
+      "pickupNote": "Recogida en hipermercados Carrefour de la Comunidad de Madrid.",
+      "selectors": {
+        "result": ".product-card, [class*='product-card']",
+        "title": ".product-card__title, [class*='title']",
+        "price": ".product-card__price, [class*='price']",
+        "link": "a[href]"
+      },
+      "aliases": [
+        "Carrefour",
+        "Carrefour.es"
+      ]
+    },
+    {
+      "id": "worten",
+      "name": "Worten",
+      "searchUrl": "https://www.worten.es/search?query={query}",
+      "shipsToSpain": true,
+      "pickupMadrid": true,
+      "pickupNote": "Recogida en tiendas Worten de Madrid.",
+      "selectors": {
+        "result": ".product-card, [class*='product-card'], [class*='ProductCard']",
+        "title": "[class*='title'], h2, h3",
+        "price": "[class*='price']",
+        "link": "a[href]"
+      },
+      "aliases": [
+        "Worten",
+        "Worten.es"
+      ]
+    },
+    {
+      "id": "coolmod",
+      "name": "Coolmod",
+      "searchUrl": "https://www.coolmod.com/busqueda?q={query}",
+      "shipsToSpain": true,
+      "pickupMadrid": false,
+      "notes": "Envío desde Alicante a toda España.",
+      "selectors": {
+        "result": ".product-item, [class*='product']",
+        "title": ".product-name, [class*='title'], h2, h3",
+        "price": ".price, [class*='price']",
+        "link": "a[href]"
+      },
+      "aliases": [
+        "Coolmod"
+      ]
+    },
+    {
+      "id": "decathlon",
+      "name": "Decathlon",
+      "searchUrl": "https://www.decathlon.es/es/search?Ntt={query}",
+      "shipsToSpain": true,
+      "pickupMadrid": true,
+      "pickupNote": "Recogida gratuita en tiendas Decathlon de Madrid.",
+      "selectors": {
+        "result": "[class*='product-block'], [class*='dpb-holder'], article",
+        "title": "[class*='product-block-title'], h2, h3",
+        "price": "[class*='price']",
+        "link": "a[href]"
+      },
+      "aliases": [
+        "Decathlon"
+      ]
+    },
+    {
+      "id": "leroymerlin",
+      "name": "Leroy Merlin",
+      "searchUrl": "https://www.leroymerlin.es/search?q={query}",
+      "shipsToSpain": true,
+      "pickupMadrid": true,
+      "pickupNote": "Recogida en tiendas Leroy Merlin de la Comunidad de Madrid.",
+      "selectors": {
+        "result": "[class*='product-card'], [class*='ProductCard'], article",
+        "title": "[class*='title'], h2, h3",
+        "price": "[class*='price']",
+        "link": "a[href]"
+      },
+      "aliases": [
+        "Leroy Merlin"
+      ]
+    },
+    {
+      "id": "idealo",
+      "name": "idealo (comparador)",
+      "searchUrl": "https://www.idealo.es/resultados.html?q={query}",
+      "shipsToSpain": true,
+      "pickupMadrid": false,
+      "notes": "Comparador: agrega precios de muchas tiendas que venden en España. Útil como red de seguridad.",
+      "selectors": {
+        "result": "[class*='sr-resultList__item'], [class*='resultItem'], [class*='offerList-item']",
+        "title": "[class*='title'], h2, h3",
+        "price": "[class*='price']",
+        "link": "a[href]"
+      },
+      "aliases": [
+        "idealo",
+        "idealo.es"
+      ]
+    }
+  ]
+}
