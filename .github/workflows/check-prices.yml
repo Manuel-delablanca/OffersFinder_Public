@@ -63,7 +63,10 @@ jobs:
         run: |
           hora=$(TZ=Europe/Madrid date +%H)
           echo "fecha=$(TZ=Europe/Madrid date +%F)" >> "$GITHUB_OUTPUT"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$hora" = "09" ]; then
+          if [ -z "${SERPAPI_API_KEY}${SERPER_API_KEY}${TELEGRAM_BOT_TOKEN}" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Este repositorio aún no está configurado: crea los secretos SERPAPI_API_KEY (o SERPER_API_KEY), TELEGRAM_BOT_TOKEN y TELEGRAM_CHAT_ID. Consulta el README, sección 'Instalar tu propia copia'."
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$hora" = "09" ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
             echo "Hora en Madrid: ${hora}:$(TZ=Europe/Madrid date +%M). Se ejecuta la comprobación."
           else
