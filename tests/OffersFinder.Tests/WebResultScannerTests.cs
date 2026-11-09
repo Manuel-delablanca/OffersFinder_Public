@@ -165,6 +165,26 @@ public class WebResultScannerTests
     }
 
     [Fact]
+    public async Task Skips_out_of_stock_pages()
+    {
+        const string soldOut = """
+            <html><head><title>Orbea MX 12</title>
+            <script type="application/ld+json">{"@type":"Product","name":"Orbea MX 12","offers":{"@type":"Offer","price":"189.00","priceCurrency":"EUR","availability":"https://schema.org/OutOfStock"}}</script>
+            </head></html>
+            """;
+        var web = new FakeWeb();
+        web.Pages["https://a.example/mx12"] = (HttpStatusCode.OK, soldOut);
+        using var fetcher = new PageFetcher(new Settings(), retries: 1, handler: web);
+        var scanner = new WebResultScanner(fetcher, new List<Store>());
+
+        var pages = await scanner.ScanAsync(new WatchItem { Query = "Orbea MX 12" }, new List<WebResult> { new("Orbea", "https://a.example/mx12", null) });
+
+        var page = Assert.Single(pages);
+        Assert.Null(page.Offer);
+        Assert.StartsWith("agotado", page.Outcome);
+    }
+
+    [Fact]
     public void Parses_organic_results_from_both_providers()
     {
         var serper = ShoppingSearchClient.ParseWeb("""{"organic":[{"title":"A","link":"https://a.example","snippet":"s"},{"title":"B","link":"javascript:void(0)"}]}""");

@@ -155,22 +155,12 @@ public sealed class OfferSearcher
     /// <summary>Comprueba que la oferta encaja con las palabras y el rango de precio del producto.</summary>
     public static bool Matches(WatchItem item, Offer offer)
     {
-        var title = offer.Title.ToLowerInvariant();
-        var required = (item.MustContain is { Count: > 0 } ? item.MustContain : Tokenize(item.Query!))
-            .Select(w => w.ToLowerInvariant());
-        if (!required.All(title.Contains)) return false;
-
-        if (item.Exclude is { Count: > 0 } && item.Exclude.Any(w => title.Contains(w.ToLowerInvariant())))
-            return false;
-
+        if (TextMatch.MissingTerms(offer.Title, TextMatch.RequiredTerms(item)).Count > 0) return false;
+        if (TextMatch.FirstExcluded(offer.Title, item.Exclude) is not null) return false;
         if (item.MaxPrice is { } max && offer.Price > max) return false;
         if (item.MinPrice is { } min && offer.Price < min) return false;
         return true;
     }
-
-    private static IEnumerable<string> Tokenize(string query) =>
-        query.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-             .Where(w => w.Length > 1);
 
     /// <summary>Extrae ofertas de una página de resultados: selectores de la tienda, JSON-LD ItemList o heurística.</summary>
     public static List<Offer> ParseResults(string html, Store store, string pageUrl)

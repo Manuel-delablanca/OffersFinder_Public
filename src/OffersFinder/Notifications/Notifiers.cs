@@ -14,6 +14,9 @@ public interface INotifier
 
     Task SendAsync(Alert alert, CancellationToken ct = default);
 
+    /// <summary>Envía un archivo (por ejemplo el informe HTML). Por defecto no hace nada; Telegram y email lo adjuntan.</summary>
+    Task SendFileAsync(string path, string caption, CancellationToken ct = default) => Task.CompletedTask;
+
     /// <summary>Envía varios avisos de una ejecución. Por defecto, uno a uno; el email los agrupa en un solo correo.</summary>
     async Task SendManyAsync(IReadOnlyList<Alert> alerts, CancellationToken ct = default)
     {
@@ -26,6 +29,12 @@ public interface INotifier
 public sealed class ConsoleNotifier : INotifier
 {
     public string Name => "consola";
+
+    public Task SendFileAsync(string path, string caption, CancellationToken ct = default)
+    {
+        Console.WriteLine($"📎 {caption}: {Path.GetFullPath(path)}");
+        return Task.CompletedTask;
+    }
 
     public Task SendAsync(Alert alert, CancellationToken ct = default)
     {
@@ -68,6 +77,20 @@ public sealed class TelegramNotifier : INotifier
         });
         using var content = new StringContent(payload, Encoding.UTF8, "application/json");
         using var response = await _http.PostAsync($"https://api.telegram.org/bot{_token}/sendMessage", content, ct);
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException($"Telegram respondió {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync(ct)}");
+    }
+
+    public async Task SendFileAsync(string path, string caption, CancellationToken ct = default)
+    {
+        using var form = new MultipartFormDataContent();
+        form.Add(new StringContent(_chatId), "chat_id");
+        form.Add(new StringContent(caption), "caption");
+        var bytes = await File.ReadAllBytesAsync(path, ct);
+        var file = new ByteArrayContent(bytes);
+        file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/html");
+        form.Add(file, "document", Path.GetFileName(path));
+        using var response = await _http.PostAsync($"https://api.telegram.org/bot{_token}/sendDocument", form, ct);
         if (!response.IsSuccessStatusCode)
             throw new InvalidOperationException($"Telegram respondió {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync(ct)}");
     }
@@ -219,6 +242,21 @@ public sealed class EmailNotifier : INotifier
             message.To.Add(to);
         message.AlternateViews.Add(AlternateView.CreateAlternateViewFromString(BuildHtml(alerts), Encoding.UTF8, "text/html"));
 
+        await client.SendMailAsync(message, ct);
+    }
+
+    public async Task SendFileAsync(string path, string caption, CancellationToken ct = default)
+    {
+        using var client = new SmtpClient(_settings.SmtpHost, _settings.SmtpPort)
+        {
+            EnableSsl = _settings.SmtpUseSsl,
+            Credentials = string.IsNullOrEmpty(_settings.SmtpUser) ? null : new NetworkCredential(_settings.SmtpUser, _settings.SmtpPassword),
+        };
+        var from = _settings.EmailFrom ?? _settings.SmtpUser ?? "offersfinder@localhost";
+        using var message = new MailMessage { From = new MailAddress(from, "OffersFinder"), Subject = caption, Body = caption, BodyEncoding = Encoding.UTF8 };
+        foreach (var to in _settings.EmailTo!.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            message.To.Add(to);
+        message.Attachments.Add(new Attachment(path));
         await client.SendMailAsync(message, ct);
     }
 

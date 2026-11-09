@@ -5,6 +5,8 @@ using AngleSharp.Html.Parser;
 
 namespace OffersFinder.Services;
 
+public enum Availability { Unknown, InStock, OutOfStock }
+
 /// <summary>Extrae el precio de la página de un producto.</summary>
 public static class PriceExtractor
 {
@@ -32,6 +34,59 @@ public static class PriceExtractor
     /// <summary>Solo fuentes estructuradas (JSON-LD, metaetiquetas, itemprop): fiable para páginas desconocidas.</summary>
     public static decimal? ExtractStructured(IDocument document) =>
         FromJsonLd(document) ?? FromMetaTags(document) ?? FromItemProp(document);
+
+    /// <summary>
+    /// Disponibilidad declarada por la página: schema.org (InStock/OutOfStock...), metaetiquetas de producto o, si no,
+    /// el texto de los elementos de stock ("agotado", "sin stock", "sold out").
+    /// </summary>
+    public static Availability ExtractAvailability(IDocument document)
+    {
+        foreach (var script in document.QuerySelectorAll("script[type='application/ld+json']"))
+        {
+            try
+            {
+                using var json = JsonDocument.Parse(script.TextContent);
+                var value = FindString(json.RootElement, "availability", 0);
+                if (value is not null) return ClassifyAvailability(value);
+            }
+            catch (JsonException) { }
+        }
+
+        foreach (var selector in new[] { "meta[property='product:availability']", "meta[property='og:availability']", "[itemprop='availability']" })
+        {
+            var element = document.QuerySelector(selector);
+            var value = element?.GetAttribute("content") ?? element?.GetAttribute("href") ?? element?.TextContent;
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                var classified = ClassifyAvailability(value);
+                if (classified != Availability.Unknown) return classified;
+            }
+        }
+
+        foreach (var element in document.QuerySelectorAll("[class*='stock'], [class*='availab'], [class*='disponib'], [id*='stock'], [id*='availab'], [id*='disponib']"))
+        {
+            var text = TextMatch.Normalize(element.TextContent);
+            if (text.Length == 0 || text.Length > 120) continue;
+            if (OutOfStockPhrases.Any(text.Contains)) return Availability.OutOfStock;
+            if (InStockPhrases.Any(text.Contains)) return Availability.InStock;
+        }
+        return Availability.Unknown;
+    }
+
+    private static readonly string[] OutOfStockPhrases =
+        { "agotado", "sin stock", "fuera de stock", "no disponible", "sold out", "out of stock", "esgotado", "descatalogado", "temporalmente sin" };
+    private static readonly string[] InStockPhrases =
+        { "en stock", "in stock", "disponible", "hay stock", "ultimas unidades", "envio inmediato" };
+
+    private static Availability ClassifyAvailability(string value)
+    {
+        var v = TextMatch.Normalize(value);
+        if (v.Contains("outofstock") || v.Contains("soldout") || v.Contains("discontinued") || v.Contains("out of stock") || v == "oos" || v.Contains("agotado"))
+            return Availability.OutOfStock;
+        if (v.Contains("instock") || v.Contains("in stock") || v.Contains("preorder") || v.Contains("limitedavailability") || v.Contains("onlineonly") || v.Contains("backorder") || v.Contains("instoreonly"))
+            return Availability.InStock;
+        return Availability.Unknown;
+    }
 
     /// <summary>Moneda declarada por la página (JSON-LD priceCurrency, metaetiquetas, itemprop) o null si no la indica.</summary>
     public static string? ExtractCurrency(IDocument document)

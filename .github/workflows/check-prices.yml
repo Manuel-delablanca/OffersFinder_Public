@@ -17,6 +17,10 @@ on:
         description: "Solo enviar un aviso de prueba a Telegram (sin comprobar precios)"
         type: boolean
         default: false
+      send_report:
+        description: "Enviar además el informe HTML y el resumen por Telegram"
+        type: boolean
+        default: false
       force_api:
         description: "Llamar a la API de búsqueda en esta ejecución aunque esté en pausa (gasta consultas)"
         type: boolean
@@ -65,6 +69,7 @@ jobs:
         run: |
           hora=$(TZ=Europe/Madrid date +%H)
           echo "fecha=$(TZ=Europe/Madrid date +%F)" >> "$GITHUB_OUTPUT"
+          echo "dia=$(TZ=Europe/Madrid date +%u)" >> "$GITHUB_OUTPUT"
           if [ -z "${SERPAPI_API_KEY}${SERPER_API_KEY}${TELEGRAM_BOT_TOKEN}" ]; then
             echo "run=false" >> "$GITHUB_OUTPUT"
             echo "Este repositorio aún no está configurado: crea los secretos SERPAPI_API_KEY (o SERPER_API_KEY), TELEGRAM_BOT_TOKEN y TELEGRAM_CHAT_ID. Consulta el README, sección 'Instalar tu propia copia'."
@@ -104,6 +109,13 @@ jobs:
           path: debug-html/
           retention-days: 3
           if-no-files-found: ignore
+
+      - name: Resumen semanal e informe
+        # Día de la semana (1 = lunes ... 7 = domingo) en la variable de repositorio SUMMARY_DAY; vacío o 'none' lo desactiva.
+        if: ${{ !inputs.test_notify && steps.hora.outputs.run == 'true' && (inputs.send_report || (github.event_name == 'schedule' && steps.hora.outputs.dia == (vars.SUMMARY_DAY || '1'))) }}
+        run: |
+          dotnet run --project src/OffersFinder -c Release --no-build -- summary --days 7
+          dotnet run --project src/OffersFinder -c Release --no-build -- send-report
 
       - name: Recordatorio programado
         # Se envía una sola vez, en la ejecución programada del día indicado en la variable de repositorio

@@ -9,8 +9,11 @@ Aplicación de consola en **.NET 10** que vigila los precios de los productos qu
   - Por **URL concreta**: lee el precio de la página del producto (JSON-LD, metaetiquetas, `itemprop`, clases `price` o un selector CSS que indiques).
 - **Tiendas**: el catálogo marca para cada tienda si envía a España y si tiene recogida en la Comunidad de Madrid. Con `pickupMadridOnly` un producto solo acepta ofertas de tiendas con recogida en Madrid.
 - **Avisos por Telegram**: bajada respecto al último precio (con porcentaje mínimo configurable), precio objetivo alcanzado y precio más bajo registrado. Cada aviso incluye las mejores ofertas con tienda, precio, enlace y si hay recogida en Madrid. Email (un solo correo HTML por ejecución) y WhatsApp son opcionales.
-- **Histórico y estadísticas**: `history` muestra mínimo, máximo, media, mediana y variación, con filtro `--month AAAA-MM`.
-- **Informe con gráficas**: `report` genera `data/report.html` con una gráfica por producto (precio, líneas de mínimo/máximo/media/mediana/objetivo) y un selector de mes global y por producto.
+- **Histórico y estadísticas**: `history` muestra mínimo, máximo, media, mediana y variación, con filtro `--month AAAA-MM`, y el último precio y mínimo de cada tienda. Se guarda el precio de cada tienda en cada consulta, no solo el mejor.
+- **Resumen semanal**: cada lunes (variable `SUMMARY_DAY`, 1 = lunes) llega por Telegram el estado de cada producto y el informe HTML como archivo adjunto, aunque no haya habido bajadas.
+- **Emparejado tolerante**: "2 TB" y "2tb", "MX-12" y "mx 12" o acentos y mayúsculas se consideran iguales; `mustContain` y `exclude` admiten sinónimos con `|` ("2tb|2000gb").
+- **Sin stock**: las fichas que declaran el producto agotado (schema.org, metaetiquetas o el texto de stock) se descartan.
+- **Informe con gráficas**: `report` genera `data/report.html` con una gráfica por producto (mejor precio, una línea por tienda, líneas de mínimo/máximo/media/mediana/objetivo), la tabla de mejores ofertas y un selector de mes global y por producto.
 - **Gestión**: `remove` elimina un producto (y su histórico), `blacklist` veta una tienda para un producto o para todos.
 
 ## Requisitos
@@ -109,6 +112,8 @@ O editando `watchlist.json` directamente:
 | `test-notify` | Envía un aviso de prueba a los canales configurados. |
 | `telegram-setup` | Muestra tu `TELEGRAM_CHAT_ID` a partir del token del bot. |
 | `notify "Título" "Texto"` | Envía un mensaje cualquiera por los canales configurados (lo usa el flujo para recordatorios). |
+| `summary [--days 7]` | Resumen de los últimos días: precio actual, variación, mínimo, objetivo y precio por tienda. El flujo lo envía cada lunes. |
+| `send-report` | Genera el informe HTML y lo envía como archivo por Telegram o email. El flujo lo envía con el resumen semanal. |
 | `diagnose [nombre]` | Muestra qué ve el programa en cada tienda: tarjetas detectadas, títulos, precios y por qué un resultado no encaja. |
 
 ## Fuente de precios: Google Shopping
@@ -180,7 +185,7 @@ Todo lo personal va en secretos y variables del repositorio; el código no conti
    - `SERPAPI_API_KEY` o `SERPER_API_KEY`: su clave de Google Shopping (ver "Fuente de precios").
    - `TELEGRAM_BOT_TOKEN`: el token de su propio bot (uno por persona, creado con @BotFather).
    - `TELEGRAM_CHAT_ID`: su chat (lo muestra `telegram-setup`, o la URL `getUpdates` del README).
-4. **Variables opcionales** (*Settings → Secrets and variables → Actions → Variables*): `API_PAUSE_UNTIL`, `REMINDER_DATE`, `REMINDER_TEXT`, `WEB_SEARCH`, `MIN_DROP_PERCENT`.
+4. **Variables opcionales** (*Settings → Secrets and variables → Actions → Variables*): `API_PAUSE_UNTIL`, `REMINDER_DATE`, `REMINDER_TEXT`, `SUMMARY_DAY` (día del resumen semanal, 1 = lunes; `none` para desactivarlo), `WEB_SEARCH`, `MIN_DROP_PERCENT`.
 5. **Permisos**: *Settings → Actions → General → Workflow permissions → Read and write permissions*, para que el flujo guarde el histórico.
 6. **Prueba**: *Actions → Comprobar precios → Run workflow* con la casilla *test_notify* para comprobar Telegram, y después una ejecución normal.
 

@@ -148,12 +148,9 @@ public sealed class Diagnostics
 
     private static string WhyNot(WatchItem item, Offer offer)
     {
-        var title = offer.Title.ToLowerInvariant();
-        var required = (item.MustContain is { Count: > 0 } ? item.MustContain : item.Query!.Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(w => w.Length > 1).ToList())
-            .Select(w => w.ToLowerInvariant()).ToList();
-        var missing = required.Where(w => !title.Contains(w)).ToList();
+        var missing = TextMatch.MissingTerms(offer.Title, TextMatch.RequiredTerms(item));
         if (missing.Count > 0) return $"falta \"{string.Join("\", \"", missing)}\"";
-        var excluded = item.Exclude?.FirstOrDefault(w => title.Contains(w.ToLowerInvariant()));
+        var excluded = TextMatch.FirstExcluded(offer.Title, item.Exclude);
         if (excluded is not null) return $"excluido por \"{excluded}\"";
         if (item.MaxPrice is { } max && offer.Price > max) return $"supera maxPrice {max}";
         if (item.MinPrice is { } min && offer.Price < min) return $"por debajo de minPrice {min}";

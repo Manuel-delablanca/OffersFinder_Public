@@ -30,6 +30,8 @@ public static class ReportGenerator
                 pickupMadridOnly = item.PickupMadridOnly,
                 excludeStores = item.ExcludeStores ?? new List<string>(),
                 records = records.Select(r => new { t = r.Timestamp.ToString("o"), p = r.Price, store = r.Store, url = r.Url, title = r.Title }),
+                storeRecords = (h?.StoreRecords ?? new List<StoreRecord>()).OrderBy(r => r.Timestamp)
+                    .Select(r => new { t = r.Timestamp.ToString("o"), store = r.Store, p = r.Price }),
                 lastOffersAt = h?.LastOffersAt?.ToString("o"),
                 lastOffers = (h?.LastOffers ?? new List<OfferRecord>()).Select(o => new { store = o.Store, price = o.Price, title = o.Title, url = o.Url, pickup = o.PickupMadrid }),
             };
@@ -185,10 +187,20 @@ public static class ReportGenerator
               const labels = records.map(r => fmtDate.format(new Date(r.t)));
               const line = (label, value, color) => ({ label, data: records.map(() => value), borderColor: color, borderDash: [6, 4], borderWidth: 1, pointRadius: 0, fill: false });
               const datasets = [
-                { label: 'Precio', data: records.map(r => r.p), borderColor: getComputedStyle(document.documentElement).getPropertyValue('--line'), backgroundColor: 'rgba(37,99,235,0.12)', tension: 0.25, fill: true, pointRadius: 3 },
+                { label: 'Mejor precio', data: records.map(r => r.p), borderColor: getComputedStyle(document.documentElement).getPropertyValue('--line'), backgroundColor: 'rgba(37,99,235,0.12)', tension: 0.25, fill: true, pointRadius: 3, borderWidth: 3 },
                 line('Mínimo', s.min, '#16a34a'), line('Máximo', s.max, '#dc2626'), line('Media', s.mean, '#f59e0b'), line('Mediana', s.median, '#7c3aed'),
               ];
               if (item.targetPrice != null) datasets.push(line('Objetivo', item.targetPrice, '#0891b2'));
+
+              // Una línea fina por tienda (las 6 con más datos), alineada con las fechas del mejor precio.
+              const storeRecs = (item.storeRecords || []).filter(r => !month || monthKey(new Date(r.t)) === month);
+              const byStore = new Map();
+              storeRecs.forEach(r => { if (!byStore.has(r.store)) byStore.set(r.store, new Map()); byStore.get(r.store).set(r.t, r.p); });
+              const palette = ['#0ea5e9', '#f97316', '#84cc16', '#ec4899', '#a855f7', '#14b8a6'];
+              [...byStore.entries()].sort((a, b) => b[1].size - a[1].size).slice(0, 6).forEach(([store, series], i) => {
+                datasets.push({ label: store, data: records.map(r => series.has(r.t) ? series.get(r.t) : null), borderColor: palette[i % palette.length],
+                  borderWidth: 1.5, pointRadius: 2, tension: 0.2, fill: false, spanGaps: true });
+              });
 
               if (charts.has(idx)) charts.get(idx).destroy();
               charts.set(idx, new Chart(canvas, {

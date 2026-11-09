@@ -49,6 +49,26 @@ public class TelegramNotifierTests
     }
 
     [Fact]
+    public async Task Sends_document_as_multipart()
+    {
+        var handler = new FakeHandler();
+        var notifier = new TelegramNotifier("TOKEN", "42", new HttpClient(handler));
+        var path = Path.Combine(Path.GetTempPath(), $"informe-{Guid.NewGuid():N}.html");
+        await File.WriteAllTextAsync(path, "<html>informe</html>");
+        try
+        {
+            await notifier.SendFileAsync(path, "Informe");
+            var (uri, body) = Assert.Single(handler.Requests);
+            Assert.EndsWith("/sendDocument", uri.AbsolutePath);
+            Assert.Contains("name=chat_id", body);
+            Assert.Contains("42", body);
+            Assert.Contains("name=document", body);
+            Assert.Contains("<html>informe</html>", body);
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
     public void Parses_chats_from_getUpdates()
     {
         const string json = """

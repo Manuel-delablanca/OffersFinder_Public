@@ -45,6 +45,11 @@ public sealed class PriceChecker
             {
                 var html = await _fetcher.GetHtmlAsync(url, item.Headers, ct);
                 var document = PriceExtractor.ParseDocument(html);
+                if (PriceExtractor.ExtractAvailability(document) == Availability.OutOfStock)
+                {
+                    _log($"  · {HostOf(url)}: agotado, se omite");
+                    continue;
+                }
                 var found = !string.IsNullOrWhiteSpace(item.Selector) ? PriceExtractor.FromSelector(document, item.Selector) : null;
                 found ??= PriceExtractor.ExtractStructured(document) ?? PriceExtractor.FromPriceClasses(document);
                 if (found is null)
@@ -88,6 +93,17 @@ public sealed class PriceChecker
         if (!history.TryGetValue(item.Key, out var itemHistory))
             history[item.Key] = itemHistory = new ItemHistory();
         itemHistory.Name = item.DisplayName;
+        if (offers.Count > 0)
+        {
+            itemHistory.StoreRecords ??= new List<StoreRecord>();
+            foreach (var group in offers.GroupBy(o => o.StoreName))
+            {
+                var cheapest = group.OrderBy(o => o.Price).First();
+                itemHistory.StoreRecords.Add(new StoreRecord { Timestamp = now, Store = cheapest.StoreName, Price = cheapest.Price, Url = cheapest.Url });
+            }
+            if (itemHistory.StoreRecords.Count > 20000)
+                itemHistory.StoreRecords.RemoveRange(0, itemHistory.StoreRecords.Count - 20000);
+        }
         if (offers.Count > 0 || item.HasQuery)
         {
             itemHistory.LastOffers = offers.Take(10).Select(o => new OfferRecord

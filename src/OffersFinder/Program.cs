@@ -30,6 +30,8 @@ public static class Program
                 "unblacklist" => Blacklist(settings, rest, add: false),
                 "test-notify" => await TestNotifyAsync(settings),
                 "notify" => await NotifyAsync(settings, rest),
+                "summary" => await SummaryAsync(settings, rest),
+                "send-report" => await SendReportAsync(settings),
                 "telegram-setup" => await TelegramSetupAsync(settings),
                 "diagnose" => await DiagnoseAsync(settings, rest),
                 "help" or "--help" or "-h" => Help(),
@@ -303,6 +305,18 @@ public static class Program
             if (month is null)
                 Console.WriteLine($"   Meses con datos: {string.Join(", ", Statistics.AvailableMonths(records))}  (filtra con --month AAAA-MM)");
 
+            var storeLatest = (h?.StoreRecords ?? new List<StoreRecord>())
+                .Where(r => month is null || Statistics.FilterByMonth(new[] { new PriceRecord { Timestamp = r.Timestamp, Price = r.Price } }, month).Any())
+                .GroupBy(r => r.Store)
+                .Select(g => (Store: g.Key, Last: g.OrderByDescending(r => r.Timestamp).First().Price, Min: g.Min(r => r.Price), Count: g.Count()))
+                .OrderBy(x => x.Last).ToList();
+            if (storeLatest.Count > 0)
+            {
+                Console.WriteLine("   Por tienda (último / mínimo / consultas):");
+                foreach (var st in storeLatest)
+                    Console.WriteLine($"     {st.Store,-28} {PriceParser.Format(st.Last, c),12} {PriceParser.Format(st.Min, c),12}   {st.Count}");
+            }
+
             var shown = showAll ? records : records.TakeLast(30).ToList();
             if (!showAll && records.Count > 30) Console.WriteLine($"   ... mostrando los últimos 30 de {records.Count} (usa --all)");
             foreach (var r in shown)
@@ -454,6 +468,39 @@ public static class Program
         return 0;
     }
 
+    /// <summary>Resumen de los últimos N días (7 por defecto) por los canales configurados.</summary>
+    private static async Task<int> SummaryAsync(Settings settings, string[] args)
+    {
+        var days = int.TryParse(OptionValue(args, "--days"), out var d) && d > 0 ? d : 7;
+        var watchlist = new WatchlistStore(settings.WatchlistPath).Load();
+        var history = new HistoryStore(settings.HistoryPath).Load();
+        var body = SummaryBuilder.Build(watchlist, history, days, DateTimeOffset.UtcNow);
+        var alert = new Alert($"📊 Resumen de precios ({days} días)", body, null);
+        var failures = 0;
+        foreach (var notifier in NotifierFactory.FromSettings(settings))
+        {
+            try { await notifier.SendAsync(alert); }
+            catch (Exception ex) { failures++; Console.Error.WriteLine($"Fallo en {notifier.Name}: {ex.Message}"); }
+        }
+        return failures == 0 ? 0 : 1;
+    }
+
+    /// <summary>Genera el informe HTML y lo envía como archivo por los canales que lo admiten (Telegram, email).</summary>
+    private static async Task<int> SendReportAsync(Settings settings)
+    {
+        var watchlist = new WatchlistStore(settings.WatchlistPath).Load();
+        var history = new HistoryStore(settings.HistoryPath).Load();
+        ReportGenerator.Write(settings.ReportPath, watchlist, history, DateTimeOffset.UtcNow);
+        var caption = $"📈 Informe de precios OffersFinder ({DateTime.Now:d}). Ábrelo en el navegador para ver las gráficas.";
+        var failures = 0;
+        foreach (var notifier in NotifierFactory.FromSettings(settings))
+        {
+            try { await notifier.SendFileAsync(settings.ReportPath, caption); Console.WriteLine($"Informe enviado por {notifier.Name}."); }
+            catch (Exception ex) { failures++; Console.Error.WriteLine($"Fallo en {notifier.Name}: {ex.Message}"); }
+        }
+        return failures == 0 ? 0 : 1;
+    }
+
     /// <summary>Envía un mensaje cualquiera por los canales configurados: notify "Título" "Texto".</summary>
     private static async Task<int> NotifyAsync(Settings settings, string[] args)
     {
@@ -519,6 +566,8 @@ public static class Program
               unblacklist <idTienda> [--item <producto>] Quita la tienda de la lista negra.
               test-notify                                Envía un aviso de prueba a los canales configurados.
               notify "Título" "Texto"                    Envía un mensaje cualquiera por los canales configurados.
+              summary [--days 7]                         Envía el resumen de los últimos días (precio actual, variación, tiendas).
+              send-report                                Genera el informe HTML y lo envía como archivo (Telegram, email).
               telegram-setup                             Muestra tu TELEGRAM_CHAT_ID a partir del token del bot.
               diagnose [nombre]                          Muestra qué ve el programa en cada tienda (para ajustar selectores).
 

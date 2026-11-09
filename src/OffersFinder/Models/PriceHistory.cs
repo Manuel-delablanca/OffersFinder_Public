@@ -34,6 +34,10 @@ public sealed class ItemHistory
     [JsonPropertyName("lastTargetAlertPrice")]
     public decimal? LastTargetAlertPrice { get; set; }
 
+    /// <summary>Precio de cada tienda en cada comprobación (una fila por tienda y consulta).</summary>
+    [JsonPropertyName("storeRecords")]
+    public List<StoreRecord>? StoreRecords { get; set; }
+
     /// <summary>Mejores ofertas encontradas en la última comprobación (para el informe).</summary>
     [JsonPropertyName("lastOffers")]
     public List<OfferRecord>? LastOffers { get; set; }
@@ -64,4 +68,19 @@ public sealed class OfferRecord
 
     [JsonPropertyName("pickupMadrid")]
     public bool PickupMadrid { get; set; }
+}
+
+public sealed class StoreRecord
+{
+    [JsonPropertyName("timestamp")]
+    public DateTimeOffset Timestamp { get; set; }
+
+    [JsonPropertyName("store")]
+    public string Store { get; set; } = "";
+
+    [JsonPropertyName("price")]
+    public decimal Price { get; set; }
+
+    [JsonPropertyName("url")]
+    public string? Url { get; set; }
 }

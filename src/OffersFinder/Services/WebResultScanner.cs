@@ -108,6 +108,11 @@ public sealed class WebResultScanner
                 continue;
             }
             var title = PriceExtractor.ProductName(document) ?? result.Title;
+            if (PriceExtractor.ExtractAvailability(document) == Availability.OutOfStock)
+            {
+                scanned.Add(new ScannedPage(result.Url, $"agotado: \"{Truncate(title, 60)}\"", null));
+                continue;
+            }
             var price = PriceExtractor.ExtractStructured(document);
             var viaCss = false;
             if (price is null && TitleMatches(item, title))
@@ -134,14 +139,8 @@ public sealed class WebResultScanner
     }
 
     /// <summary>El título de la página contiene todas las palabras requeridas del producto.</summary>
-    public static bool TitleMatches(WatchItem item, string title)
-    {
-        var lower = title.ToLowerInvariant();
-        var required = item.MustContain is { Count: > 0 }
-            ? item.MustContain
-            : item.Query!.Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(w => w.Length > 1).ToList();
-        return required.All(w => lower.Contains(w.ToLowerInvariant()));
-    }
+    public static bool TitleMatches(WatchItem item, string title) =>
+        TextMatch.ContainsAll(title, TextMatch.RequiredTerms(item));
 
     private static string Truncate(string text, int max) => text.Length <= max ? text : text[..(max - 1)] + "…";
 }
