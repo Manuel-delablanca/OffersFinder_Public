@@ -155,7 +155,8 @@ jobs:
           if [ "${{ github.event_name }}" = "schedule" ] && [ "${{ inputs.test_notify }}" != "true" ]; then
             echo "${{ steps.hora.outputs.fecha }}" > data/last-run.txt
           fi
-          git add data/history.json data/report.html data/last-run.txt
+          git add data/history.json data/report.html
+          [ -f data/last-run.txt ] && git add data/last-run.txt
           if git diff --cached --quiet; then
             echo "Sin cambios en el histórico."
           else
