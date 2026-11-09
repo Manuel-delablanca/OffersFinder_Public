@@ -25,6 +25,10 @@ on:
         description: "Llamar a la API de búsqueda en esta ejecución aunque esté en pausa (gasta consultas)"
         type: boolean
         default: false
+      only_items:
+        description: "Comprobar solo estos productos (textos del nombre o números, separados por comas). Vacío = todos"
+        type: string
+        default: ""
 
 permissions:
   contents: write
@@ -48,6 +52,7 @@ jobs:
       API_PAUSE_UNTIL: ${{ inputs.force_api && 'none' || vars.API_PAUSE_UNTIL }}
       # Días de la semana (1 = lunes … 7 = domingo) en los que, aun en pausa, sí se llama a la API.
       API_PAUSE_EXCEPT_WEEKDAYS: ${{ vars.API_PAUSE_EXCEPT_WEEKDAYS || '1' }}
+      ONLY_ITEMS: ${{ inputs.only_items }}
       # Avisos por Telegram: secretos TELEGRAM_BOT_TOKEN (token de @BotFather) y TELEGRAM_CHAT_ID
       # (lo muestra el comando 'telegram-setup'; también vale como variable de repositorio).
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -143,5 +148,9 @@ jobs:
             echo "Sin cambios en el histórico."
           else
             git commit -m "chore: actualizar histórico de precios [skip ci]"
-            git push
+            # Si la rama ha avanzado mientras se ejecutaba, se integra antes de subir (hasta 3 intentos).
+            for intento in 1 2 3; do
+              git pull --rebase origin "${{ github.ref_name }}" && git push && break
+              echo "Reintento $intento de la subida del histórico..."; sleep 5
+            done
           fi

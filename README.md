@@ -103,6 +103,7 @@ O editando `watchlist.json` directamente:
 |---|---|
 | `check` | Comprueba todos los productos, guarda el histórico, regenera el informe y envía avisos. |
 | `check --loop --every 6h` | Lo mismo, repitiendo cada intervalo (`30m`, `6h`, `1d`). |
+| `check --only casco,3` | Comprueba solo los productos cuyo nombre contenga "casco" o tengan el número 3. En GitHub, la casilla **only_items** del flujo manual. |
 | `check --dry-run` | Comprueba sin guardar ni enviar avisos externos. |
 | `list` | Lista los productos con último precio, mínimo y objetivo. |
 | `history [nombre] [--month 2026-11] [--all]` | Histórico con mínimo, máximo, media, mediana y variación. |

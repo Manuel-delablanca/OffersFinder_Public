@@ -59,4 +59,19 @@ public static partial class TextMatch
     }
 
     public static bool ContainsAll(string title, IEnumerable<string> terms) => MissingTerms(title, terms).Count == 0;
+
+    /// <summary>Productos de la lista cuyo nombre contiene alguno de los filtros, o cuyo número (1, 2, …) coincide. Sin filtros, todos.</summary>
+    public static List<WatchItem> FilterItems(IReadOnlyList<WatchItem> items, IReadOnlyCollection<string> filters)
+    {
+        if (filters.Count == 0) return items.ToList();
+        var selected = new List<WatchItem>();
+        for (var i = 0; i < items.Count; i++)
+        {
+            var name = Normalize(items[i].DisplayName);
+            var query = Normalize(items[i].Query);
+            if (filters.Any(f => (int.TryParse(f, out var n) && n == i + 1) || (Normalize(f) is { Length: > 0 } nf && (name.Contains(nf) || query.Contains(nf)))))
+                selected.Add(items[i]);
+        }
+        return selected;
+    }
 }

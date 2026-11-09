@@ -1,7 +1,7 @@
 namespace OffersFinder.Models;
 
 /// <summary>Ajustes globales, leídos de variables de entorno (y de un archivo .env si existe).</summary>
-public sealed class Settings
+public sealed record Settings
 {
     public string WatchlistPath { get; init; } = "watchlist.json";
     public string StoresPath { get; init; } = "stores.json";
@@ -12,6 +12,9 @@ public sealed class Settings
     public int MaxOffersInAlert { get; init; } = 5;
     /// <summary>Carpeta donde volcar el HTML de cada página descargada (diagnóstico). Vacío = desactivado.</summary>
     public string? DebugDir { get; init; }
+
+    /// <summary>Limitar la comprobación a los productos cuyo nombre contenga alguno de estos textos (o cuyo número coincida).</summary>
+    public IReadOnlyList<string> OnlyItems { get; init; } = Array.Empty<string>();
 
     /// <summary>Clave de Serper.dev. Si está definida, las búsquedas usan Google Shopping (España) en lugar de consultar cada tienda.</summary>
     public string? SerperApiKey { get; init; }
@@ -81,6 +84,7 @@ public sealed class Settings
             RequestTimeoutSeconds = ParseInt(Env("REQUEST_TIMEOUT_SECONDS")) ?? 20,
             MaxOffersInAlert = ParseInt(Env("MAX_OFFERS_IN_ALERT")) ?? 5,
             DebugDir = Env("DEBUG_DIR"),
+            OnlyItems = (Env("ONLY_ITEMS") ?? "").Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
             SerperApiKey = Env("SERPER_API_KEY"),
             SerpApiKey = Env("SERPAPI_API_KEY"),
             ApiPauseUntil = DateOnly.TryParseExact(Env("API_PAUSE_UNTIL"), "yyyy-MM-dd", out var pause) ? pause : null,

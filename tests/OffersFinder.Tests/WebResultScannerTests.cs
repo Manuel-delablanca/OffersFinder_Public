@@ -53,7 +53,7 @@ public class WebResultScannerTests
 
         var offer = Assert.Single(pages.Where(p => p.Offer is not null)).Offer!;
         Assert.Equal(189m, offer.Price);
-        Assert.Equal("Orbea MX 12 Azul", offer.Title);
+        Assert.StartsWith("Orbea MX 12 Azul", offer.Title);
         Assert.Equal("bicispepe", offer.StoreId);
         Assert.Equal("bicispepe.example", offer.StoreName);
 
@@ -157,6 +157,8 @@ public class WebResultScannerTests
         var pages = await scanner.ScanAsync(item, results);
 
         Assert.Equal(new[] { "https://tienda-espanola.com/strider", "https://tienda.es/strider" }, pages.Where(p => p.Offer is not null).Select(p => p.Url).OrderBy(u => u));
+        Assert.Contains("tienda extranjera", pages.Single(p => p.Url.Contains("tienda-espanola.com")).Offer!.Title);   // .com: no se puede asegurar el envío
+        Assert.DoesNotContain("tienda extranjera", pages.Single(p => p.Url.Contains("tienda.es")).Offer!.Title);
         Assert.Contains(pages, p => p.Url.Contains("chile.example") && p.Outcome.Contains("CLP"));
         Assert.Contains(pages, p => p.Url.Contains("extranjera") && p.Outcome.Contains("euros"));
         Assert.Contains(pages, p => p.Url.EndsWith("tienda.cl/strider") && p.Outcome.Contains(".cl"));

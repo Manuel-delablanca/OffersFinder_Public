@@ -137,7 +137,9 @@ public sealed class WebResultScanner
                 continue;
             }
             var shippingCost = PriceExtractor.ExtractShippingCost(document);
-            var offer = new Offer(storeId, storeName, viaCss ? title + " (precio leído del texto)" : title, price.Value, result.Url, pickup,
+            // Una tienda que no es .es ni está en el catálogo puede ser de otro país de la zona euro: se avisa para comprobar el envío.
+            var caveat = store is null && !host.EndsWith(".es", StringComparison.OrdinalIgnoreCase) ? " ⚠ tienda extranjera: comprueba que envíe a España" : "";
+            var offer = new Offer(storeId, storeName, (viaCss ? title + " (precio leído del texto)" : title) + caveat, price.Value, result.Url, pickup,
                 shippingCost is null ? null : (shippingCost == 0 ? "Envío gratis" : $"Envío {PriceParser.Format(shippingCost.Value)}"), shippingCost);
             if (!OfferSearcher.Matches(item, offer))
             {

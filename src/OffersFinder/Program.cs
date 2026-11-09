@@ -50,6 +50,8 @@ public static class Program
         var loop = args.Contains("--loop");
         var every = ParseInterval(OptionValue(args, "--every")) ?? TimeSpan.FromHours(6);
         var dryRun = args.Contains("--dry-run");
+        if (OptionValue(args, "--only") is { } only)
+            settings = settings with { OnlyItems = only.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) };
 
         using var cts = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
@@ -75,6 +77,13 @@ public static class Program
             Console.WriteLine($"La lista {settings.WatchlistPath} está vacía. Añade productos con 'add' o edita el archivo.");
             return;
         }
+        var itemsToCheck = TextMatch.FilterItems(watchlist.Items, settings.OnlyItems);
+        if (settings.OnlyItems.Count > 0)
+        {
+            Console.WriteLine($"Filtro de productos \"{string.Join(", ", settings.OnlyItems)}\": {itemsToCheck.Count} de {watchlist.Items.Count}" +
+                              (itemsToCheck.Count == 0 ? " (ninguno coincide; nombres disponibles: " + string.Join(" | ", watchlist.Items.Select(i => i.DisplayName)) + ")" : ""));
+            if (itemsToCheck.Count == 0) return;
+        }
 
         var stores = new StoreCatalogStore(settings.StoresPath).Load().Stores;
         var historyStore = new HistoryStore(settings.HistoryPath);
@@ -91,7 +100,7 @@ public static class Program
         var source = settings.UseShoppingSearch && settings.UseStoreSearch ? $"Google Shopping{web} vía {provider} + tiendas"
                    : settings.UseShoppingSearch ? $"Google Shopping{web} (España) vía {provider}"
                    : settings.UseStoreSearch ? "tiendas del catálogo" : settings.ApiPaused ? "en pausa" : "ninguna";
-        Console.WriteLine($"[{DateTime.Now:g}] Comprobando {watchlist.Items.Count} producto(s) " +
+        Console.WriteLine($"[{DateTime.Now:g}] Comprobando {itemsToCheck.Count} producto(s) " +
                           $"(avisos: {string.Join(", ", notifiers.Select(n => n.Name))}; búsquedas: {source})");
 
         using var fetcher = new PageFetcher(settings);
@@ -99,7 +108,7 @@ public static class Program
         var checker = new PriceChecker(settings, fetcher, searcher, Console.WriteLine);
 
         var alerts = new List<Alert>();
-        foreach (var item in watchlist.Items)
+        foreach (var item in itemsToCheck)
         {
             ct.ThrowIfCancellationRequested();
             Console.WriteLine($"→ {item.DisplayName}");
@@ -454,7 +463,7 @@ public static class Program
         var stores = new StoreCatalogStore(settings.StoresPath).Load().Stores;
         var needle = string.Join(' ', args);
         var items = string.IsNullOrWhiteSpace(needle)
-            ? watchlist.Items
+            ? TextMatch.FilterItems(watchlist.Items, settings.OnlyItems)
             : watchlist.Items.Where(i => i.DisplayName.Contains(needle, StringComparison.OrdinalIgnoreCase)).ToList();
         if (items.Count == 0)
         {
@@ -580,7 +589,8 @@ public static class Program
             OffersFinder – vigila precios y avisa cuando bajan.
 
             Comandos:
-              check [--loop] [--every 6h] [--dry-run]   Comprueba todos los productos (por defecto). --loop repite cada intervalo.
+              check [--only a,b] [--loop] [--every 6h] [--dry-run]
+                                                         Comprueba los productos (todos, o solo los que contengan a/b o tengan ese número).
               add URL | --query "texto" [opciones]       Añade un producto a la lista.
                   --name "Nombre"  --target 199.99  --max 400  --min 50  --selector ".price"
                   --exclude funda,cable  --stores amazon_es,pccomponentes  --pickup-madrid
