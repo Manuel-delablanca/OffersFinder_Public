@@ -25,6 +25,13 @@ public sealed class WatchItem
     [JsonPropertyName("mustContain")]
     public List<string>? MustContain { get; set; }
 
+    /// <summary>
+    /// Conjuntos alternativos de palabras que también se aceptan (p. ej. [["casco","micro"]] para títulos recortados
+    /// de Google Shopping). Las ofertas aceptadas así se marcan como "modelo sin confirmar".
+    /// </summary>
+    [JsonPropertyName("alsoAccept")]
+    public List<List<string>>? AlsoAccept { get; set; }
+
     /// <summary>Palabras que descartan un resultado (fundas, accesorios, reacondicionados...).</summary>
     [JsonPropertyName("exclude")]
     public List<string>? Exclude { get; set; }

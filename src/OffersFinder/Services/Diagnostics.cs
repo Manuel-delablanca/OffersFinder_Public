@@ -71,7 +71,10 @@ public sealed class Diagnostics
                 {
                     var store = _searcher.StoreForName(r.Source);
                     var offer = new Offer(store?.Id ?? Store.Normalize(r.Source), store?.Name ?? r.Source, r.Title, r.Price, r.Url, store?.PickupMadrid ?? false);
-                    var status = offers.Any(o => o.Url == offer.Url) ? "✓" : "✗ " + (OfferSearcher.Matches(item, offer) ? "tienda excluida o sin recogida en Madrid" : WhyNot(item, offer));
+                    var kind = OfferSearcher.MatchKind(item, offer);
+                    var status = offers.Any(o => o.Url == offer.Url)
+                        ? (kind == MatchResult.Loose ? "✓ (sin confirmar)" : "✓")
+                        : "✗ " + (kind != MatchResult.None ? "tienda excluida o sin recogida en Madrid" : WhyNot(item, offer));
                     _log($"    {status} {PriceParser.Format(r.Price, item.Currency),12}  {Trim(r.Source, 22),-22} {Trim(r.Title, 60)}");
                 }
             }

@@ -196,6 +196,21 @@
         "idealo",
         "idealo.es"
       ]
+    },
+    {
+      "id": "mamut",
+      "name": "Mamut Concept Store",
+      "enabled": true,
+      "searchUrl": "https://mamutconceptstore.com/search?q={query}",
+      "shipsToSpain": true,
+      "pickupMadrid": true,
+      "pickupNote": "Tienda infantil con locales en Madrid; confirma la recogida al hacer el pedido.",
+      "notes": "Aparece en Google Shopping como 'Mamut Concept Store' y en la web como mamutconceptstore.com.",
+      "aliases": [
+        "Mamut Concept Store",
+        "Mamut",
+        "mamutconceptstore"
+      ]
     }
   ]
 }

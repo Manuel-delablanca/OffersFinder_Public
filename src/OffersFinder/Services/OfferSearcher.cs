@@ -4,6 +4,8 @@ using OffersFinder.Models;
 
 namespace OffersFinder.Services;
 
+public enum MatchResult { None, Loose, Exact }
+
 /// <summary>Busca un producto en las tiendas del catálogo y devuelve las ofertas que encajan.</summary>
 public sealed class OfferSearcher
 {
@@ -60,7 +62,7 @@ public sealed class OfferSearcher
             if (item.PickupMadridOnly && !pickup) continue;
 
             var offer = new Offer(storeId, storeName, r.Title, r.Price, r.Url, pickup, r.Delivery, Offer.ParseShipping(r.Delivery));
-            if (Matches(item, offer)) offers.Add(offer);
+            if (Accept(item, offer) is { } accepted) offers.Add(accepted);
         }
         return offers;
     }
@@ -142,7 +144,7 @@ public sealed class OfferSearcher
             {
                 var html = await _fetcher.GetHtmlAsync(url, MergeHeaders(store.Headers, item.Headers), ct);
                 var found = ParseResults(html, store, url);
-                var matching = found.Where(o => Matches(item, o)).ToList();
+                var matching = found.Select(o => Accept(item, o)).Where(o => o is not null).Select(o => o!).ToList();
                 _log($"  · {store.Name}: {found.Count} resultados, {matching.Count} encajan");
                 offers.AddRange(matching);
             }
@@ -159,15 +161,30 @@ public sealed class OfferSearcher
             .ToList();
     }
 
+    public const string UnconfirmedMark = " (modelo sin confirmar)";
+
     /// <summary>Comprueba que la oferta encaja con las palabras y el rango de precio del producto.</summary>
-    public static bool Matches(WatchItem item, Offer offer)
+    public static bool Matches(WatchItem item, Offer offer) => MatchKind(item, offer) != MatchResult.None;
+
+    /// <summary>Exact: cumple las palabras requeridas. Loose: solo un conjunto de 'alsoAccept'. None: no encaja.</summary>
+    public static MatchResult MatchKind(WatchItem item, Offer offer)
     {
-        if (TextMatch.MissingTerms(offer.Title, TextMatch.RequiredTerms(item)).Count > 0) return false;
-        if (TextMatch.FirstExcluded(offer.Title, item.Exclude) is not null) return false;
-        if (item.MaxPrice is { } max && offer.Price > max) return false;
-        if (item.MinPrice is { } min && offer.Price < min) return false;
-        return true;
+        if (TextMatch.FirstExcluded(offer.Title, item.Exclude) is not null) return MatchResult.None;
+        if (item.MaxPrice is { } max && offer.Price > max) return MatchResult.None;
+        if (item.MinPrice is { } min && offer.Price < min) return MatchResult.None;
+        if (TextMatch.MissingTerms(offer.Title, TextMatch.RequiredTerms(item)).Count == 0) return MatchResult.Exact;
+        if (item.AlsoAccept is { Count: > 0 } && item.AlsoAccept.Any(set => set.Count > 0 && TextMatch.ContainsAll(offer.Title, set)))
+            return MatchResult.Loose;
+        return MatchResult.None;
     }
+
+    /// <summary>Devuelve la oferta tal cual, o marcada como "modelo sin confirmar" si solo encaja por 'alsoAccept'.</summary>
+    public static Offer? Accept(WatchItem item, Offer offer) => MatchKind(item, offer) switch
+    {
+        MatchResult.Exact => offer,
+        MatchResult.Loose => offer with { Title = offer.Title + UnconfirmedMark },
+        _ => null,
+    };
 
     /// <summary>Extrae ofertas de una página de resultados: selectores de la tienda, JSON-LD ItemList o heurística.</summary>
     public static List<Offer> ParseResults(string html, Store store, string pageUrl)

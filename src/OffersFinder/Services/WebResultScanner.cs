@@ -141,12 +141,13 @@ public sealed class WebResultScanner
             var caveat = store is null && !host.EndsWith(".es", StringComparison.OrdinalIgnoreCase) ? " ⚠ tienda extranjera: comprueba que envíe a España" : "";
             var offer = new Offer(storeId, storeName, (viaCss ? title + " (precio leído del texto)" : title) + caveat, price.Value, result.Url, pickup,
                 shippingCost is null ? null : (shippingCost == 0 ? "Envío gratis" : $"Envío {PriceParser.Format(shippingCost.Value)}"), shippingCost);
-            if (!OfferSearcher.Matches(item, offer))
+            var accepted = OfferSearcher.Accept(item, offer);
+            if (accepted is null)
             {
                 scanned.Add(new ScannedPage(result.Url, $"no encaja: {PriceParser.Format(price.Value, item.Currency)} \"{Truncate(title, 60)}\"", null));
                 continue;
             }
-            scanned.Add(new ScannedPage(result.Url, "✓", offer));
+            scanned.Add(new ScannedPage(result.Url, "✓", accepted));
         }
         return scanned;
     }

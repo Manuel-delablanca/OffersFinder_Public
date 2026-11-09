@@ -87,6 +87,7 @@ O editando `watchlist.json` directamente:
 | `query` | Texto a buscar en el catálogo de tiendas. Puede combinarse con `url`; se usa el precio más bajo de ambos. |
 | `mustContain` | Palabras que deben aparecer en el título del resultado (si falta, se usan las de `query`). |
 | `exclude` | Palabras que descartan un resultado (accesorios, otras capacidades...). |
+| `alsoAccept` | Conjuntos alternativos de palabras que también se aceptan, p. ej. `[["casco","micro"]]`, para títulos recortados de Google Shopping. Esas ofertas se marcan como "modelo sin confirmar"; conviene acompañarlo de `exclude` con los otros modelos. |
 | `minPrice` / `maxPrice` | Rango plausible: evita que un accesorio barato o un pack caro se cuele como "mejor oferta". |
 | `targetPrice` | Avisa cuando el precio sea igual o inferior. Se vuelve a avisar solo si baja más o si subió y volvió a bajar. |
 | `pickupMadridOnly` | Solo tiendas con recogida en la Comunidad de Madrid. |
