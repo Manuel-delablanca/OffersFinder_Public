@@ -126,15 +126,18 @@ jobs:
           retention-days: 3
           if-no-files-found: ignore
 
-      - name: Resumen diario
-        # Tras cada comprobación programada (o con la casilla send_report). La variable SUMMARY_DAILY=false lo desactiva.
+      - name: Resumen diario con gráficas
+        # Tras cada comprobación programada (o con la casilla send_report): texto y una imagen por producto.
+        # La variable SUMMARY_DAILY=false lo desactiva.
         if: ${{ !inputs.test_notify && steps.hora.outputs.run == 'true' && vars.SUMMARY_DAILY != 'false' && (inputs.send_report || github.event_name == 'schedule') }}
-        run: dotnet run --project src/OffersFinder -c Release --no-build -- summary --days 7
+        run: |
+          dotnet run --project src/OffersFinder -c Release --no-build -- summary --days 7
+          dotnet run --project src/OffersFinder -c Release --no-build -- send-report --images-only
 
-      - name: Informe semanal con gráficas
+      - name: Informe semanal (archivo HTML)
         # Día de la semana (1 = lunes ... 7 = domingo) en la variable de repositorio REPORT_DAY; 'none' lo desactiva.
         if: ${{ !inputs.test_notify && steps.hora.outputs.run == 'true' && (inputs.send_report || (github.event_name == 'schedule' && steps.hora.outputs.dia == (vars.REPORT_DAY || '1'))) }}
-        run: dotnet run --project src/OffersFinder -c Release --no-build -- send-report
+        run: dotnet run --project src/OffersFinder -c Release --no-build -- send-report --file-only
 
       - name: Recordatorio programado
         # Se envía una sola vez, en la ejecución programada del día indicado en la variable de repositorio

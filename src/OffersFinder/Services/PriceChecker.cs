@@ -32,6 +32,10 @@ public sealed class PriceChecker
         string? bestStore = null;
         string? bestTitle = null;
 
+        if (!history.TryGetValue(item.Key, out var itemHistory))
+            history[item.Key] = itemHistory = new ItemHistory();
+        itemHistory.Name = item.DisplayName;
+
         // 1) Fichas de producto concretas (no gastan consultas de la API)
         foreach (var url in item.AllUrls)
         {
@@ -71,9 +75,15 @@ public sealed class PriceChecker
             }
         }
 
-        // 2) Búsqueda (Google Shopping / web / tiendas), salvo que la API esté en pausa
-        if (item.HasQuery && !_settings.ApiPaused)
+        // 2) Búsqueda (Google Shopping / web / tiendas), salvo que la API esté en pausa.
+        //    Un producto que nunca se ha buscado en la API se busca igualmente, aunque haya pausa.
+        var firstApiSearch = item.HasQuery && itemHistory.LastApiSearchAt is null;
+        if (item.HasQuery && (!_settings.ApiPaused || firstApiSearch))
+        {
+            if (_settings.ApiPaused) _log("  ▶ primera búsqueda de este producto: se consulta la API aunque esté en pausa");
             offers.AddRange(await _searcher.SearchAsync(item, ct));
+            if (_searcher.UsesApi) itemHistory.LastApiSearchAt = now;
+        }
         else if (item.HasQuery && item.AllUrls.Any() == false)
             error ??= $"API en pausa hasta {_settings.ApiPauseUntil:yyyy-MM-dd} y el producto no tiene URL que leer.";
 
@@ -90,9 +100,6 @@ public sealed class PriceChecker
         else if (error is null && item.HasQuery)
             error = "Ninguna tienda devolvió resultados que encajen.";
 
-        if (!history.TryGetValue(item.Key, out var itemHistory))
-            history[item.Key] = itemHistory = new ItemHistory();
-        itemHistory.Name = item.DisplayName;
         if (offers.Count > 0)
         {
             itemHistory.StoreRecords ??= new List<StoreRecord>();

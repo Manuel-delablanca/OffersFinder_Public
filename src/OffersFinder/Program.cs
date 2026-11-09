@@ -31,7 +31,7 @@ public static class Program
                 "test-notify" => await TestNotifyAsync(settings),
                 "notify" => await NotifyAsync(settings, rest),
                 "summary" => await SummaryAsync(settings, rest),
-                "send-report" => await SendReportAsync(settings),
+                "send-report" => await SendReportAsync(settings, rest),
                 "telegram-setup" => await TelegramSetupAsync(settings),
                 "diagnose" => await DiagnoseAsync(settings, rest),
                 "help" or "--help" or "-h" => Help(),
@@ -153,7 +153,9 @@ public static class Program
 
     private static ShoppingSearchClient? BuildShoppingClient(Settings settings)
     {
-        if (!settings.UseShoppingSearch) return null;
+        // Con la API en pausa el cliente se crea igualmente: PriceChecker decide por producto si se consulta
+        // (nunca durante la pausa, salvo la primera búsqueda de un producto nuevo).
+        if (!settings.HasShoppingKey || settings.SearchMode is "stores") return null;
         return !string.IsNullOrWhiteSpace(settings.SerperApiKey)
             ? new ShoppingSearchClient(settings.SerperApiKey, endpoint: settings.SerperEndpoint, location: settings.SerperLocation, provider: ShoppingProvider.Serper)
             : new ShoppingSearchClient(settings.SerpApiKey!, endpoint: settings.SerperEndpoint, location: settings.SerperLocation, provider: ShoppingProvider.SerpApi);
@@ -167,7 +169,8 @@ public static class Program
         var scanner = shopping is not null && settings.WebSearch
             ? new WebResultScanner(fetcher, stores, watchlist.BlacklistedStores, settings.WebSearchMaxPages)
             : null;
-        return new OfferSearcher(fetcher, stores, watchlist.BlacklistedStores, Console.WriteLine, shopping, settings.UseStoreSearch, scanner);
+        var useStores = settings.SearchMode is "stores" or "both" || (settings.SearchMode == "auto" && !settings.HasShoppingKey);
+        return new OfferSearcher(fetcher, stores, watchlist.BlacklistedStores, Console.WriteLine, shopping, useStores, scanner);
     }
 
     /// <summary>Texto con el resultado de cada producto comprobado (precio, tienda, envío, nº de ofertas o el motivo de no tener precio).</summary>
@@ -527,9 +530,14 @@ public static class Program
         return failures == 0 ? 0 : 1;
     }
 
-    /// <summary>Genera el informe HTML y lo envía como archivo por los canales que lo admiten (Telegram, email).</summary>
-    private static async Task<int> SendReportAsync(Settings settings)
+    /// <summary>
+    /// Envía las gráficas (una imagen por producto) y el informe HTML completo como archivo.
+    /// --images-only envía solo las imágenes; --file-only solo el archivo.
+    /// </summary>
+    private static async Task<int> SendReportAsync(Settings settings, string[] args)
     {
+        var imagesOnly = args.Contains("--images-only");
+        var fileOnly = args.Contains("--file-only");
         var watchlist = new WatchlistStore(settings.WatchlistPath).Load();
         var history = new HistoryStore(settings.HistoryPath).Load();
         ReportGenerator.Write(settings.ReportPath, watchlist, history, DateTimeOffset.UtcNow);
@@ -537,7 +545,7 @@ public static class Program
         var failures = 0;
 
         // Una imagen por producto con su gráfica (lo que mejor se ve en el móvil)...
-        foreach (var item in watchlist.Items)
+        foreach (var item in fileOnly ? Enumerable.Empty<WatchItem>() : TextMatch.FilterItems(watchlist.Items, settings.OnlyItems))
         {
             history.TryGetValue(item.Key, out var h);
             var stats = Statistics.Compute(h?.Records ?? new List<PriceRecord>());
@@ -558,6 +566,7 @@ public static class Program
         }
 
         // ...y el informe completo como archivo.
+        if (imagesOnly) return failures == 0 ? 0 : 1;
         var fileCaption = $"📊 Informe completo OffersFinder ({DateTime.Now:d}): gráficas por mes, estadísticas y tiendas.";
         foreach (var notifier in notifiers)
         {
@@ -635,7 +644,7 @@ public static class Program
               test-notify                                Envía un aviso de prueba a los canales configurados.
               notify "Título" "Texto"                    Envía un mensaje cualquiera por los canales configurados.
               summary [--days 7]                         Envía el resumen de los últimos días (precio actual, variación, tiendas).
-              send-report                                Genera el informe HTML y lo envía como archivo (Telegram, email).
+              send-report [--images-only|--file-only]    Envía las gráficas (imagen por producto) y el informe HTML como archivo.
               telegram-setup                             Muestra tu TELEGRAM_CHAT_ID a partir del token del bot.
               diagnose [nombre]                          Muestra qué ve el programa en cada tienda (para ajustar selectores).
 

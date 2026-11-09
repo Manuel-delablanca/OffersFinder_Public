@@ -38,6 +38,10 @@ public sealed class ItemHistory
     [JsonPropertyName("storeRecords")]
     public List<StoreRecord>? StoreRecords { get; set; }
 
+    /// <summary>Última vez que este producto se buscó en la API (Google Shopping / web). Null = nunca.</summary>
+    [JsonPropertyName("lastApiSearchAt")]
+    public DateTimeOffset? LastApiSearchAt { get; set; }
+
     /// <summary>Mejores ofertas encontradas en la última comprobación (para el informe).</summary>
     [JsonPropertyName("lastOffers")]
     public List<OfferRecord>? LastOffers { get; set; }

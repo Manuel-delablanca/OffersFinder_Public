@@ -35,6 +35,9 @@ public sealed class OfferSearcher
         return await _webScanner.ScanAsync(item, results, ct);
     }
 
+    /// <summary>True si las búsquedas pasan por la API de Google Shopping / web (y por tanto gastan consultas).</summary>
+    public bool UsesApi => _shopping is not null;
+
     /// <summary>Tienda del catálogo que corresponde a un nombre dado por un agregador, si la hay.</summary>
     public Store? StoreForName(string? sourceName) => _stores.FirstOrDefault(s => s.MatchesName(sourceName));
 
