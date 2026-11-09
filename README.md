@@ -13,7 +13,8 @@ Aplicación de consola en **.NET 10** que vigila los precios de los productos qu
 - **Resumen semanal**: cada lunes (variable `SUMMARY_DAY`, 1 = lunes) llega por Telegram el estado de cada producto y el informe HTML como archivo adjunto, aunque no haya habido bajadas.
 - **Emparejado tolerante**: "2 TB" y "2tb", "MX-12" y "mx 12" o acentos y mayúsculas se consideran iguales; `mustContain` y `exclude` admiten sinónimos con `|` ("2tb|2000gb").
 - **Sin stock**: las fichas que declaran el producto agotado (schema.org, metaetiquetas o el texto de stock) se descartan.
-- **Informe con gráficas**: `report` genera `data/report.html` con una gráfica por producto (mejor precio, una línea por tienda, líneas de mínimo/máximo/media/mediana/objetivo), la tabla de mejores ofertas y un selector de mes global y por producto.
+- **Informe con gráficas**: `report` genera `data/report.html`, un HTML estático sin JavaScript (se ve en cualquier visor, móvil incluido) con una gráfica SVG por producto (mejor precio, una línea por tienda y objetivo), estadísticas, pestañas por mes, tabla por tienda y tabla de mejores ofertas.
+- **Avisos destacados**: el aviso de precio objetivo alcanzado se fija en el chat de Telegram para que quede arriba del todo.
 - **Gestión**: `remove` elimina un producto (y su histórico), `blacklist` veta una tienda para un producto o para todos.
 
 ## Requisitos
@@ -113,7 +114,7 @@ O editando `watchlist.json` directamente:
 | `telegram-setup` | Muestra tu `TELEGRAM_CHAT_ID` a partir del token del bot. |
 | `notify "Título" "Texto"` | Envía un mensaje cualquiera por los canales configurados (lo usa el flujo para recordatorios). |
 | `summary [--days 7]` | Resumen de los últimos días: precio actual, variación, mínimo, objetivo y precio por tienda. El flujo lo envía cada lunes. |
-| `send-report` | Genera el informe HTML y lo envía como archivo por Telegram o email. El flujo lo envía con el resumen semanal. |
+| `send-report` | Envía por Telegram una imagen con la gráfica de cada producto y, después, el informe HTML completo como archivo. El flujo lo envía con el resumen semanal. |
 | `diagnose [nombre]` | Muestra qué ve el programa en cada tienda: tarjetas detectadas, títulos, precios y por qué un resultado no encaja. |
 
 ## Fuente de precios: Google Shopping

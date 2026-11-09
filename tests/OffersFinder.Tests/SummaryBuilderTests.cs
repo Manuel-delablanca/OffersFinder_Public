@@ -28,11 +28,11 @@ public class SummaryBuilderTests
 
         var text = SummaryBuilder.Build(watchlist, history, 7, now);
 
-        Assert.Contains("Bici: 179,00 € en B", text);
-        Assert.Contains("▼ 21,00 € (-10.5 %)", text);   // respecto al último precio anterior a la ventana (200)
-        Assert.Contains("mín. 7d 179,00 €", text);
-        Assert.Contains("objetivo 150,00 € (faltan 29,00 €)", text);
-        Assert.Contains("B 179,00 € · A 190,00 €", text);
+        Assert.Contains("🛒 Bici\n   Precio: 179,00 € (B)", text);
+        Assert.Contains("Variación 7d: ▼ -21,00 € (-10.5 %)", text);   // respecto al último precio anterior a la ventana (200)
+        Assert.Contains("Mínimo 7d: 179,00 €", text);
+        Assert.Contains("Objetivo: 150,00 € (faltan 29,00 €)", text);
+        Assert.Contains("   • B: 179,00 €\n   • A: 190,00 €", text);
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public class SummaryBuilderTests
 
         var text = SummaryBuilder.Build(watchlist, history, 7, now);
 
-        Assert.Contains("Vieja: sin precio en los últimos 7 días (último conocido 99,00 €", text);
-        Assert.Contains("Nueva: sin precio en los últimos 7 días", text);
+        Assert.Contains("🛒 Vieja\n   Sin precio en los últimos 7 días\n   Último conocido: 99,00 €", text);
+        Assert.Contains("🛒 Nueva\n   Sin precio en los últimos 7 días", text);
     }
 }

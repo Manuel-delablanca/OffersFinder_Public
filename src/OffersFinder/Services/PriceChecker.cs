@@ -162,7 +162,7 @@ public sealed class PriceChecker
                 itemHistory.LastTargetAlertPrice = price;
                 var body = $"{item.DisplayName}\nPrecio actual: {formatted} (objetivo: {PriceParser.Format(target, item.Currency)})";
                 body += OffersSummary(offers, item.Currency);
-                yield return new Alert($"🎯 Precio objetivo alcanzado: {item.DisplayName}", body, bestUrl);
+                yield return new Alert($"🎯 Precio objetivo alcanzado: {item.DisplayName}", body, bestUrl, Pin: true);
             }
         }
         else if (item.TargetPrice is not null)

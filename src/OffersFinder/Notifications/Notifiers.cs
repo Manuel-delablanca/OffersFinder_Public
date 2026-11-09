@@ -6,7 +6,7 @@ using OffersFinder.Models;
 
 namespace OffersFinder.Notifications;
 
-public sealed record Alert(string Title, string Body, string? Url);
+public sealed record Alert(string Title, string Body, string? Url, bool Pin = false);
 
 public interface INotifier
 {
@@ -16,6 +16,9 @@ public interface INotifier
 
     /// <summary>Envía un archivo (por ejemplo el informe HTML). Por defecto no hace nada; Telegram y email lo adjuntan.</summary>
     Task SendFileAsync(string path, string caption, CancellationToken ct = default) => Task.CompletedTask;
+
+    /// <summary>Envía una imagen (gráfica PNG). Por defecto no hace nada; Telegram la muestra como foto.</summary>
+    Task SendImageAsync(byte[] png, string fileName, string caption, CancellationToken ct = default) => Task.CompletedTask;
 
     /// <summary>Envía varios avisos de una ejecución. Por defecto, uno a uno; el email los agrupa en un solo correo.</summary>
     async Task SendManyAsync(IReadOnlyList<Alert> alerts, CancellationToken ct = default)
@@ -33,6 +36,12 @@ public sealed class ConsoleNotifier : INotifier
     public Task SendFileAsync(string path, string caption, CancellationToken ct = default)
     {
         Console.WriteLine($"📎 {caption}: {Path.GetFullPath(path)}");
+        return Task.CompletedTask;
+    }
+
+    public Task SendImageAsync(byte[] png, string fileName, string caption, CancellationToken ct = default)
+    {
+        Console.WriteLine($"🖼 {fileName} ({png.Length / 1024} KB): {caption.Split('\n')[0]}");
         return Task.CompletedTask;
     }
 
@@ -77,8 +86,43 @@ public sealed class TelegramNotifier : INotifier
         });
         using var content = new StringContent(payload, Encoding.UTF8, "application/json");
         using var response = await _http.PostAsync($"https://api.telegram.org/bot{_token}/sendMessage", content, ct);
+        var body = await response.Content.ReadAsStringAsync(ct);
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException($"Telegram respondió {(int)response.StatusCode}: {body}");
+
+        // Los avisos importantes (precio objetivo) se fijan en el chat para que queden arriba del todo.
+        if (alert.Pin && TryGetMessageId(body, out var messageId))
+        {
+            var pin = JsonSerializer.Serialize(new { chat_id = _chatId, message_id = messageId, disable_notification = false });
+            using var pinContent = new StringContent(pin, Encoding.UTF8, "application/json");
+            using var pinResponse = await _http.PostAsync($"https://api.telegram.org/bot{_token}/pinChatMessage", pinContent, ct);
+            // Si no se puede fijar (p. ej. sin permiso), el aviso ya ha llegado: no es un error.
+        }
+    }
+
+    public async Task SendImageAsync(byte[] png, string fileName, string caption, CancellationToken ct = default)
+    {
+        using var form = new MultipartFormDataContent();
+        form.Add(new StringContent(_chatId), "chat_id");
+        form.Add(new StringContent(caption), "caption");
+        var file = new ByteArrayContent(png);
+        file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+        form.Add(file, "photo", fileName);
+        using var response = await _http.PostAsync($"https://api.telegram.org/bot{_token}/sendPhoto", form, ct);
         if (!response.IsSuccessStatusCode)
             throw new InvalidOperationException($"Telegram respondió {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync(ct)}");
+    }
+
+    private static bool TryGetMessageId(string json, out long messageId)
+    {
+        messageId = 0;
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.TryGetProperty("result", out var result) &&
+                   result.TryGetProperty("message_id", out var id) && id.TryGetInt64(out messageId);
+        }
+        catch (JsonException) { return false; }
     }
 
     public async Task SendFileAsync(string path, string caption, CancellationToken ct = default)

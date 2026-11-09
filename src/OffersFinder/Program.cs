@@ -491,11 +491,35 @@ public static class Program
         var watchlist = new WatchlistStore(settings.WatchlistPath).Load();
         var history = new HistoryStore(settings.HistoryPath).Load();
         ReportGenerator.Write(settings.ReportPath, watchlist, history, DateTimeOffset.UtcNow);
-        var caption = $"📈 Informe de precios OffersFinder ({DateTime.Now:d}). Ábrelo en el navegador para ver las gráficas.";
+        var notifiers = NotifierFactory.FromSettings(settings);
         var failures = 0;
-        foreach (var notifier in NotifierFactory.FromSettings(settings))
+
+        // Una imagen por producto con su gráfica (lo que mejor se ve en el móvil)...
+        foreach (var item in watchlist.Items)
         {
-            try { await notifier.SendFileAsync(settings.ReportPath, caption); Console.WriteLine($"Informe enviado por {notifier.Name}."); }
+            history.TryGetValue(item.Key, out var h);
+            var stats = Statistics.Compute(h?.Records ?? new List<PriceRecord>());
+            if (stats is null) continue;
+            var c = item.Currency;
+            var caption = $"📈 {item.DisplayName}\nÚltimo: {PriceParser.Format(stats.Last.Price, c)}{(stats.Last.Store is null ? "" : $" ({stats.Last.Store})")}\n" +
+                          $"Mínimo: {PriceParser.Format(stats.Min, c)} · Máximo: {PriceParser.Format(stats.Max, c)} · Media: {PriceParser.Format(stats.Mean, c)} · Mediana: {PriceParser.Format(stats.Median, c)}" +
+                          (item.TargetPrice is { } t ? $"\nObjetivo: {PriceParser.Format(t, c)}" : "");
+            byte[] png;
+            try { png = SkiaChart.RenderPng(item.DisplayName, ReportGenerator.ChartSeriesFor(item, h), item.TargetPrice, c); }
+            catch (Exception ex) { Console.Error.WriteLine($"No se pudo generar la imagen de {item.DisplayName}: {ex.Message}"); continue; }
+            var fileName = $"{Store.Normalize(item.DisplayName)}.png";
+            foreach (var notifier in notifiers)
+            {
+                try { await notifier.SendImageAsync(png, fileName, caption); }
+                catch (Exception ex) { failures++; Console.Error.WriteLine($"Fallo en {notifier.Name}: {ex.Message}"); }
+            }
+        }
+
+        // ...y el informe completo como archivo.
+        var fileCaption = $"📊 Informe completo OffersFinder ({DateTime.Now:d}): gráficas por mes, estadísticas y tiendas.";
+        foreach (var notifier in notifiers)
+        {
+            try { await notifier.SendFileAsync(settings.ReportPath, fileCaption); Console.WriteLine($"Informe enviado por {notifier.Name}."); }
             catch (Exception ex) { failures++; Console.Error.WriteLine($"Fallo en {notifier.Name}: {ex.Message}"); }
         }
         return failures == 0 ? 0 : 1;

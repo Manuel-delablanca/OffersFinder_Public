@@ -49,6 +49,35 @@ public class TelegramNotifierTests
     }
 
     [Fact]
+    public async Task Pins_important_alerts_after_sending()
+    {
+        var handler = new FakeHandler { Response = "{\"ok\":true,\"result\":{\"message_id\":77}}" };
+        var notifier = new TelegramNotifier("TOKEN", "42", new HttpClient(handler));
+
+        await notifier.SendAsync(new Alert("🎯 Objetivo", "cuerpo", null, Pin: true));
+
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.EndsWith("/pinChatMessage", handler.Requests[1].Uri.AbsolutePath);
+        Assert.Contains("\"message_id\":77", handler.Requests[1].Body);
+
+        handler.Requests.Clear();
+        await notifier.SendAsync(new Alert("⬇️ Bajada", "cuerpo", null));
+        Assert.Single(handler.Requests); // los avisos normales no se fijan
+    }
+
+    [Fact]
+    public async Task Sends_photo_as_multipart()
+    {
+        var handler = new FakeHandler();
+        var notifier = new TelegramNotifier("TOKEN", "42", new HttpClient(handler));
+        await notifier.SendImageAsync(new byte[] { 0x89, 0x50, 0x4E, 0x47 }, "grafica.png", "Gráfica");
+        var (uri, body) = Assert.Single(handler.Requests);
+        Assert.EndsWith("/sendPhoto", uri.AbsolutePath);
+        Assert.Contains("name=photo", body);
+        Assert.Contains("filename=grafica.png", body);
+    }
+
+    [Fact]
     public async Task Sends_document_as_multipart()
     {
         var handler = new FakeHandler();
