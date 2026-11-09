@@ -88,6 +88,21 @@ public static class PriceExtractor
         return Availability.Unknown;
     }
 
+    /// <summary>
+    /// Comprueba que los elementos de precio de la página (clases price/precio, itemprop=price, metaetiquetas de precio)
+    /// muestran euros. Una mención a "EUR" en un selector de monedas del pie no cuenta.
+    /// </summary>
+    public static bool PriceElementsMentionEuro(IDocument document)
+    {
+        foreach (var element in document.QuerySelectorAll("[class*='price'], [class*='precio'], [itemprop='price'], [id*='price'], [data-price]"))
+        {
+            var text = (element.GetAttribute("content") ?? "") + " " + element.TextContent;
+            if (text.Length > 400) continue; // contenedores grandes, no un precio
+            if (text.Contains('€') || text.Contains("EUR", StringComparison.Ordinal)) return true;
+        }
+        return false;
+    }
+
     /// <summary>Moneda declarada por la página (JSON-LD priceCurrency, metaetiquetas, itemprop) o null si no la indica.</summary>
     public static string? ExtractCurrency(IDocument document)
     {

@@ -10,7 +10,7 @@ Aplicación de consola en **.NET 10** que vigila los precios de los productos qu
 - **Tiendas**: el catálogo marca para cada tienda si envía a España y si tiene recogida en la Comunidad de Madrid. Con `pickupMadridOnly` un producto solo acepta ofertas de tiendas con recogida en Madrid.
 - **Avisos por Telegram**: bajada respecto al último precio (con porcentaje mínimo configurable), precio objetivo alcanzado y precio más bajo registrado. Cada aviso incluye las mejores ofertas con tienda, precio, enlace y si hay recogida en Madrid. Email (un solo correo HTML por ejecución) y WhatsApp son opcionales.
 - **Histórico y estadísticas**: `history` muestra mínimo, máximo, media, mediana y variación, con filtro `--month AAAA-MM`, y el último precio y mínimo de cada tienda. Se guarda el precio de cada tienda en cada consulta, no solo el mejor.
-- **Resumen semanal**: cada lunes (variable `SUMMARY_DAY`, 1 = lunes) llega por Telegram el estado de cada producto y el informe HTML como archivo adjunto, aunque no haya habido bajadas.
+- **Resumen diario e informe semanal**: tras cada comprobación llega por Telegram el estado de cada producto (precio, variación, mínimo, objetivo y precio por tienda) aunque no haya bajadas; cada lunes (variable `REPORT_DAY`) llegan además la gráfica de cada producto como imagen y el informe HTML completo.
 - **Emparejado tolerante**: "2 TB" y "2tb", "MX-12" y "mx 12" o acentos y mayúsculas se consideran iguales; `mustContain` y `exclude` admiten sinónimos con `|` ("2tb|2000gb").
 - **Sin stock**: las fichas que declaran el producto agotado (schema.org, metaetiquetas o el texto de stock) se descartan.
 - **Informe con gráficas**: `report` genera `data/report.html`, un HTML estático sin JavaScript (se ve en cualquier visor, móvil incluido) con una gráfica SVG por producto (mejor precio, una línea por tienda y objetivo), estadísticas, pestañas por mes, tabla por tienda y tabla de mejores ofertas.
@@ -113,7 +113,7 @@ O editando `watchlist.json` directamente:
 | `test-notify` | Envía un aviso de prueba a los canales configurados. |
 | `telegram-setup` | Muestra tu `TELEGRAM_CHAT_ID` a partir del token del bot. |
 | `notify "Título" "Texto"` | Envía un mensaje cualquiera por los canales configurados (lo usa el flujo para recordatorios). |
-| `summary [--days 7]` | Resumen de los últimos días: precio actual, variación, mínimo, objetivo y precio por tienda. El flujo lo envía cada lunes. |
+| `summary [--days 7]` | Resumen de los últimos días: precio actual, variación, mínimo, objetivo y precio por tienda. El flujo lo envía a diario. |
 | `send-report` | Envía por Telegram una imagen con la gráfica de cada producto y, después, el informe HTML completo como archivo. El flujo lo envía con el resumen semanal. |
 | `diagnose [nombre]` | Muestra qué ve el programa en cada tienda: tarjetas detectadas, títulos, precios y por qué un resultado no encaja. |
 
@@ -130,7 +130,7 @@ Cada resultado trae título, precio, tienda y enlace. El catálogo `stores.json`
 
 **Búsqueda web además de Shopping.** Con la misma clave, el programa hace también una búsqueda normal en Google, lee las páginas de resultados (hasta `WEB_SEARCH_MAX_PAGES`, 10 por defecto) y añade el precio cuando la página lo declara de forma estructurada (JSON-LD, metaetiquetas o `itemprop`), que es lo habitual en Shopify, PrestaShop, WooCommerce y similares. Así entran tiendas pequeñas que no están en Shopping. Las páginas que no son tiendas (foros, YouTube, Wikipedia) y las tiendas que bloquean el acceso automático se omiten. Cuesta una consulta más por producto; desactívalo con `WEB_SEARCH=false` (en GitHub, la variable de repositorio `WEB_SEARCH`).
 
-**Reservar consultas.** Con `API_PAUSE_UNTIL=AAAA-MM-DD` (en GitHub, la variable de repositorio del mismo nombre) la aplicación no llama a la API hasta esa fecha y solo lee las fichas de producto indicadas en `url` y `urls`. Útil para guardar el cupo gratuito para fechas como el Black Friday. Para una comprobación completa puntual durante la pausa, lanza el flujo a mano con la casilla **force_api** marcada. Si defines además la variable `REMINDER_DATE` (AAAA-MM-DD), ese día el flujo te envía un recordatorio por Telegram con el texto de `REMINDER_TEXT` (opcional) y cómo reactivar la API.
+**Reservar consultas.** Con `API_PAUSE_UNTIL=AAAA-MM-DD` (en GitHub, la variable de repositorio del mismo nombre) la aplicación no llama a la API hasta esa fecha y solo lee las fichas de producto indicadas en `url` y `urls`. Útil para guardar el cupo gratuito para fechas como el Black Friday. Con `API_PAUSE_EXCEPT_WEEKDAYS` (por defecto `1`, lunes) la pausa no se aplica esos días de la semana, de modo que hay al menos una comprobación completa semanal. Para una comprobación completa puntual durante la pausa, lanza el flujo a mano con la casilla **force_api** marcada. Si defines además la variable `REMINDER_DATE` (AAAA-MM-DD), ese día el flujo te envía un recordatorio por Telegram con el texto de `REMINDER_TEXT` (opcional) y cómo reactivar la API.
 
 `SEARCH_MODE` controla la fuente de tiendas del catálogo: `auto` (Google Shopping si hay clave; si no, tiendas), `shopping`, `stores` o `both`.
 
@@ -186,7 +186,7 @@ Todo lo personal va en secretos y variables del repositorio; el código no conti
    - `SERPAPI_API_KEY` o `SERPER_API_KEY`: su clave de Google Shopping (ver "Fuente de precios").
    - `TELEGRAM_BOT_TOKEN`: el token de su propio bot (uno por persona, creado con @BotFather).
    - `TELEGRAM_CHAT_ID`: su chat (lo muestra `telegram-setup`, o la URL `getUpdates` del README).
-4. **Variables opcionales** (*Settings → Secrets and variables → Actions → Variables*): `API_PAUSE_UNTIL`, `REMINDER_DATE`, `REMINDER_TEXT`, `SUMMARY_DAY` (día del resumen semanal, 1 = lunes; `none` para desactivarlo), `WEB_SEARCH`, `MIN_DROP_PERCENT`.
+4. **Variables opcionales** (*Settings → Secrets and variables → Actions → Variables*): `API_PAUSE_UNTIL`, `REMINDER_DATE`, `REMINDER_TEXT`, `SUMMARY_DAILY` (`false` para no recibir el resumen diario), `REPORT_DAY` (día del informe con gráficas, 1 = lunes; `none` para desactivarlo), `API_PAUSE_EXCEPT_WEEKDAYS` (días en que la pausa de la API no se aplica, por defecto `1`, lunes), `WEB_SEARCH`, `MIN_DROP_PERCENT`.
 5. **Permisos**: *Settings → Actions → General → Workflow permissions → Read and write permissions*, para que el flujo guarde el histórico.
 6. **Prueba**: *Actions → Comprobar precios → Run workflow* con la casilla *test_notify* para comprobar Telegram, y después una ejecución normal.
 

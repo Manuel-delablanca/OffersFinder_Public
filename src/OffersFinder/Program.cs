@@ -85,6 +85,8 @@ public static class Program
         var provider = !string.IsNullOrWhiteSpace(settings.SerperApiKey) ? "Serper" : "SerpApi";
         if (settings.ApiPaused)
             Console.WriteLine($"⏸ API de búsqueda en pausa hasta {settings.ApiPauseUntil:yyyy-MM-dd}: solo se leen las fichas de producto (URL).");
+        else if (settings.ApiPauseUntil is { } until && settings.Today < until)
+            Console.WriteLine($"▶ API en pausa hasta {until:yyyy-MM-dd}, pero hoy es día de excepción: se llama a la API.");
         var web = settings.UseShoppingSearch && settings.WebSearch ? " + Google web" : "";
         var source = settings.UseShoppingSearch && settings.UseStoreSearch ? $"Google Shopping{web} vía {provider} + tiendas"
                    : settings.UseShoppingSearch ? $"Google Shopping{web} (España) vía {provider}"

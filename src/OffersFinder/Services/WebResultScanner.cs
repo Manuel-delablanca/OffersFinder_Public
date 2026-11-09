@@ -47,6 +47,13 @@ public sealed class WebResultScanner
                 scanned.Add(new ScannedPage(result.Url, "omitida (no es una tienda o bloquea el acceso)", null));
                 continue;
             }
+            // Dominios de otro país (.cl, .mx, .de, .uk…): no venden en España salvo excepciones; se omiten.
+            var tld = host[(host.LastIndexOf('.') + 1)..];
+            if (tld.Length == 2 && tld != "es" && tld != "eu")
+            {
+                scanned.Add(new ScannedPage(result.Url, $"dominio de otro país (.{tld})", null));
+                continue;
+            }
 
             var store = _stores.FirstOrDefault(s => Uri.TryCreate(s.SearchUrl, UriKind.Absolute, out var su) &&
                                                    string.Equals(su.Host.StartsWith("www.") ? su.Host[4..] : su.Host, host, StringComparison.OrdinalIgnoreCase));
@@ -102,9 +109,11 @@ public sealed class WebResultScanner
                 scanned.Add(new ScannedPage(result.Url, $"precio en otra moneda ({currency}), no vende en España", null));
                 continue;
             }
-            if (currency is null && !html.Contains('€') && !html.Contains("EUR", StringComparison.Ordinal))
+            // Sin moneda declarada, solo valen tiendas .es o páginas cuyos elementos de precio muestren euros
+            // (muchas tiendas extranjeras convierten la moneda según el visitante y mencionan EUR en un selector).
+            if (currency is null && !host.EndsWith(".es", StringComparison.OrdinalIgnoreCase) && !PriceExtractor.PriceElementsMentionEuro(document))
             {
-                scanned.Add(new ScannedPage(result.Url, "la página no muestra precios en euros", null));
+                scanned.Add(new ScannedPage(result.Url, "la página no muestra el precio en euros", null));
                 continue;
             }
             var title = PriceExtractor.ProductName(document) ?? result.Title;

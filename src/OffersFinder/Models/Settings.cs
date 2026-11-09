@@ -30,7 +30,11 @@ public sealed class Settings
     /// <summary>Hasta esta fecha (AAAA-MM-DD, inclusive el día anterior) no se hacen llamadas a la API de búsqueda; solo se leen las URL.</summary>
     public DateOnly? ApiPauseUntil { get; init; }
     public DateOnly Today { get; init; } = DateOnly.FromDateTime(DateTime.Now);
-    public bool ApiPaused => ApiPauseUntil is { } until && Today < until;
+    /// <summary>Días de la semana (1 = lunes … 7 = domingo) en los que la pausa no se aplica y sí se llama a la API.</summary>
+    public IReadOnlyCollection<int> ApiPauseExceptWeekdays { get; init; } = Array.Empty<int>();
+    public bool ApiPaused => ApiPauseUntil is { } until && Today < until && !ApiPauseExceptWeekdays.Contains(IsoWeekday(Today));
+
+    private static int IsoWeekday(DateOnly date) => date.DayOfWeek == DayOfWeek.Sunday ? 7 : (int)date.DayOfWeek;
 
     public bool HasShoppingKey => !string.IsNullOrWhiteSpace(SerperApiKey) || !string.IsNullOrWhiteSpace(SerpApiKey);
     public bool UseShoppingSearch => HasShoppingKey && !ApiPaused && SearchMode is "auto" or "shopping" or "both";
@@ -80,6 +84,8 @@ public sealed class Settings
             SerperApiKey = Env("SERPER_API_KEY"),
             SerpApiKey = Env("SERPAPI_API_KEY"),
             ApiPauseUntil = DateOnly.TryParseExact(Env("API_PAUSE_UNTIL"), "yyyy-MM-dd", out var pause) ? pause : null,
+            ApiPauseExceptWeekdays = (Env("API_PAUSE_EXCEPT_WEEKDAYS") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(d => int.TryParse(d, out var n) ? n : 0).Where(n => n is >= 1 and <= 7).ToList(),
             SerperLocation = Env("SERPER_LOCATION") ?? "Spain",
             SerperEndpoint = Env("SERPER_ENDPOINT"),
             SearchMode = (Env("SEARCH_MODE") ?? "auto").ToLowerInvariant(),

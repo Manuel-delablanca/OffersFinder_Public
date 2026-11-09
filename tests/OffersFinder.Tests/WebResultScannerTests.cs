@@ -129,29 +129,37 @@ public class WebResultScannerTests
             <script type="application/ld+json">{"@type":"Product","name":"Strider 12 Sport","offers":{"@type":"Offer","price":"101550","priceCurrency":"CLP"}}</script>
             </head></html>
             """;
-        const string usa = """
-            <html><head><title>Strider 12 Sport</title></head><body><span class="price">$129.99</span></body></html>
+        // Tienda extranjera que convierte la moneda al visitante: precio en dólares y "EUR" solo en el selector de monedas.
+        const string converted = """
+            <html><head><title>Strider 12 Sport</title></head>
+            <body><span class="product-price">$101.55</span><select class="currency"><option>USD</option><option>EUR</option></select></body></html>
             """;
-        const string spain = """
+        const string spainCom = """
+            <html><head><title>Strider 12 Sport</title></head><body><span class="price">129,99 €</span></body></html>
+            """;
+        const string spainEs = """
             <html><head><title>Strider 12 Sport</title>
-            <script type="application/ld+json">{"@type":"Product","name":"Strider 12 Sport","offers":{"@type":"Offer","price":"129.00","priceCurrency":"EUR"}}</script>
+            <script type="application/ld+json">{"@type":"Product","name":"Strider 12 Sport","offers":{"@type":"Offer","price":"129.00"}}</script>
             </head></html>
             """;
         var web = new FakeWeb();
         web.Pages["https://chile.example/strider"] = (HttpStatusCode.OK, chile);
-        web.Pages["https://usa.example/strider"] = (HttpStatusCode.OK, usa);
-        web.Pages["https://es.example/strider"] = (HttpStatusCode.OK, spain);
+        web.Pages["https://tienda-extranjera.com/strider"] = (HttpStatusCode.OK, converted);
+        web.Pages["https://tienda-espanola.com/strider"] = (HttpStatusCode.OK, spainCom);
+        web.Pages["https://tienda.es/strider"] = (HttpStatusCode.OK, spainEs);
+        web.Pages["https://tienda.cl/strider"] = (HttpStatusCode.OK, spainCom);
         using var fetcher = new PageFetcher(new Settings(), retries: 1, handler: web);
         var scanner = new WebResultScanner(fetcher, new List<Store>());
         var item = new WatchItem { Query = "Strider 12" };
-        var results = new List<WebResult> { new("a", "https://chile.example/strider", null), new("b", "https://usa.example/strider", null), new("c", "https://es.example/strider", null) };
+        var results = new[] { "https://chile.example/strider", "https://tienda-extranjera.com/strider", "https://tienda-espanola.com/strider", "https://tienda.es/strider", "https://tienda.cl/strider" }
+            .Select(u => new WebResult("Strider 12 Sport", u, null)).ToList();
 
         var pages = await scanner.ScanAsync(item, results);
 
-        var ok = Assert.Single(pages, p => p.Offer is not null);
-        Assert.Equal("https://es.example/strider", ok.Url);
-        Assert.Contains(pages, p => p.Url.Contains("chile") && p.Outcome.Contains("CLP"));
-        Assert.Contains(pages, p => p.Url.Contains("usa") && p.Outcome.Contains("euros"));
+        Assert.Equal(new[] { "https://tienda-espanola.com/strider", "https://tienda.es/strider" }, pages.Where(p => p.Offer is not null).Select(p => p.Url).OrderBy(u => u));
+        Assert.Contains(pages, p => p.Url.Contains("chile.example") && p.Outcome.Contains("CLP"));
+        Assert.Contains(pages, p => p.Url.Contains("extranjera") && p.Outcome.Contains("euros"));
+        Assert.Contains(pages, p => p.Url.EndsWith("tienda.cl/strider") && p.Outcome.Contains(".cl"));
     }
 
     [Fact]
