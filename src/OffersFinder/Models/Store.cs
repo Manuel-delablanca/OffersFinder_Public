@@ -99,5 +99,33 @@ public sealed class StoreCatalog
     public List<Store> Stores { get; set; } = new();
 }
 
-/// <summary>Una oferta encontrada en una tienda.</summary>
-public sealed record Offer(string StoreId, string StoreName, string Title, decimal Price, string Url, bool PickupMadrid);
+/// <summary>Una oferta encontrada en una tienda. <see cref="Shipping"/> es el texto de envío tal como lo da la fuente;
+/// <see cref="ShippingCost"/> su importe si se ha podido interpretar (0 = gratis, null = desconocido).</summary>
+public sealed record Offer(string StoreId, string StoreName, string Title, decimal Price, string Url, bool PickupMadrid,
+    string? Shipping = null, decimal? ShippingCost = null)
+{
+    /// <summary>Precio con el envío sumado cuando se conoce; si no, el precio del producto.</summary>
+    public decimal TotalPrice => Price + (ShippingCost ?? 0m);
+
+    /// <summary>Precio que se usa para comparar y ordenar según la configuración del producto.</summary>
+    public decimal EffectivePrice(WatchItem item) => item.CompareWithShipping ? TotalPrice : Price;
+
+    /// <summary>Texto corto del envío para avisos e informes.</summary>
+    public string ShippingLabel => ShippingCost switch
+    {
+        0m => "envío gratis",
+        { } cost => $"envío {Services.PriceParser.Format(cost)}",
+        null when !string.IsNullOrWhiteSpace(Shipping) => Shipping!.Trim(),
+        _ => "envío no indicado",
+    };
+
+    /// <summary>Interpreta el texto de envío: "Envío gratis" → 0, "Envío de 4,99 €" → 4,99, otros → null.</summary>
+    public static decimal? ParseShipping(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var n = Services.TextMatch.Normalize(text);
+        if (n.Contains("gratis") || n.Contains("gratuit") || n.Contains("free") || n.Contains("sin coste") || n.Contains("sin gastos")) return 0m;
+        if (!text.Contains('€') && !n.Contains("eur")) return null; // "Envío en 2 días" no es un importe
+        return Services.PriceParser.Parse(text);
+    }
+}

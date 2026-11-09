@@ -68,6 +68,12 @@ public sealed class OfferRecord
 
     [JsonPropertyName("pickupMadrid")]
     public bool PickupMadrid { get; set; }
+
+    [JsonPropertyName("shipping")]
+    public string? Shipping { get; set; }
+
+    [JsonPropertyName("shippingCost")]
+    public decimal? ShippingCost { get; set; }
 }
 
 public sealed class StoreRecord
@@ -83,4 +89,10 @@ public sealed class StoreRecord
 
     [JsonPropertyName("url")]
     public string? Url { get; set; }
+
+    [JsonPropertyName("shipping")]
+    public string? Shipping { get; set; }
+
+    [JsonPropertyName("shippingCost")]
+    public decimal? ShippingCost { get; set; }
 }

@@ -32,7 +32,7 @@ public class SummaryBuilderTests
         Assert.Contains("Variación 7d: ▼ -21,00 € (-10.5 %)", text);   // respecto al último precio anterior a la ventana (200)
         Assert.Contains("Mínimo 7d: 179,00 €", text);
         Assert.Contains("Objetivo: 150,00 € (faltan 29,00 €)", text);
-        Assert.Contains("   • B: 179,00 €\n   • A: 190,00 €", text);
+        Assert.Contains("   • B: 179,00 € · envío no indicado\n   • A: 190,00 € · envío no indicado", text);
     }
 
     [Fact]

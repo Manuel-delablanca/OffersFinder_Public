@@ -56,7 +56,7 @@ public sealed class OfferSearcher
             var pickup = store?.PickupMadrid ?? false;
             if (item.PickupMadridOnly && !pickup) continue;
 
-            var offer = new Offer(storeId, storeName, r.Title, r.Price, r.Url, pickup);
+            var offer = new Offer(storeId, storeName, r.Title, r.Price, r.Url, pickup, r.Delivery, Offer.ParseShipping(r.Delivery));
             if (Matches(item, offer)) offers.Add(offer);
         }
         return offers;
@@ -147,8 +147,8 @@ public sealed class OfferSearcher
 
         return offers
             .GroupBy(o => o.Url)
-            .Select(g => g.OrderBy(o => o.Price).First())
-            .OrderBy(o => o.Price)
+            .Select(g => g.OrderBy(o => o.EffectivePrice(item)).First())
+            .OrderBy(o => o.EffectivePrice(item))
             .ToList();
     }
 

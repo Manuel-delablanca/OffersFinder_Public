@@ -103,6 +103,51 @@ public static class PriceExtractor
         return false;
     }
 
+    /// <summary>Coste de envío declarado en JSON-LD (offers.shippingDetails.shippingRate.value), si existe.</summary>
+    public static decimal? ExtractShippingCost(IDocument document)
+    {
+        foreach (var script in document.QuerySelectorAll("script[type='application/ld+json']"))
+        {
+            try
+            {
+                using var json = JsonDocument.Parse(script.TextContent);
+                var rate = FindElement(json.RootElement, "shippingRate", 0);
+                if (rate is { ValueKind: JsonValueKind.Object } r && r.TryGetProperty("value", out var value))
+                {
+                    if (value.ValueKind == JsonValueKind.Number) return value.GetDecimal();
+                    if (value.ValueKind == JsonValueKind.String && decimal.TryParse(value.GetString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var d)) return d;
+                }
+            }
+            catch (JsonException) { }
+        }
+        return null;
+    }
+
+    private static JsonElement? FindElement(JsonElement element, string property, int depth)
+    {
+        if (depth > 12) return null;
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                if (element.TryGetProperty(property, out var direct)) return direct;
+                foreach (var child in element.EnumerateObject())
+                {
+                    var nested = FindElement(child.Value, property, depth + 1);
+                    if (nested is not null) return nested;
+                }
+                return null;
+            case JsonValueKind.Array:
+                foreach (var child in element.EnumerateArray())
+                {
+                    var nested = FindElement(child, property, depth + 1);
+                    if (nested is not null) return nested;
+                }
+                return null;
+            default:
+                return null;
+        }
+    }
+
     /// <summary>Moneda declarada por la página (JSON-LD priceCurrency, metaetiquetas, itemprop) o null si no la indica.</summary>
     public static string? ExtractCurrency(IDocument document)
     {

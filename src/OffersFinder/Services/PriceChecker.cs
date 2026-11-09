@@ -77,11 +77,11 @@ public sealed class PriceChecker
         else if (item.HasQuery && item.AllUrls.Any() == false)
             error ??= $"API en pausa hasta {_settings.ApiPauseUntil:yyyy-MM-dd} y el producto no tiene URL que leer.";
 
-        offers = offers.GroupBy(o => o.Url).Select(g => g.OrderBy(o => o.Price).First()).OrderBy(o => o.Price).ToList();
+        offers = offers.GroupBy(o => o.Url).Select(g => g.OrderBy(o => o.EffectivePrice(item)).First()).OrderBy(o => o.EffectivePrice(item)).ToList();
         var best = offers.FirstOrDefault();
         if (best is not null)
         {
-            price = best.Price;
+            price = best.EffectivePrice(item);
             bestUrl = best.Url;
             bestStore = best.StoreName;
             bestTitle = best.Title;
@@ -98,8 +98,8 @@ public sealed class PriceChecker
             itemHistory.StoreRecords ??= new List<StoreRecord>();
             foreach (var group in offers.GroupBy(o => o.StoreName))
             {
-                var cheapest = group.OrderBy(o => o.Price).First();
-                itemHistory.StoreRecords.Add(new StoreRecord { Timestamp = now, Store = cheapest.StoreName, Price = cheapest.Price, Url = cheapest.Url });
+                var cheapest = group.OrderBy(o => o.EffectivePrice(item)).First();
+                itemHistory.StoreRecords.Add(new StoreRecord { Timestamp = now, Store = cheapest.StoreName, Price = cheapest.EffectivePrice(item), Url = cheapest.Url, Shipping = cheapest.Shipping, ShippingCost = cheapest.ShippingCost });
             }
             if (itemHistory.StoreRecords.Count > 20000)
                 itemHistory.StoreRecords.RemoveRange(0, itemHistory.StoreRecords.Count - 20000);
@@ -108,7 +108,7 @@ public sealed class PriceChecker
         {
             itemHistory.LastOffers = offers.Take(10).Select(o => new OfferRecord
             {
-                Store = o.StoreName, Price = o.Price, Title = o.Title, Url = o.Url, PickupMadrid = o.PickupMadrid,
+                Store = o.StoreName, Price = o.Price, Title = o.Title, Url = o.Url, PickupMadrid = o.PickupMadrid, Shipping = o.Shipping, ShippingCost = o.ShippingCost,
             }).ToList();
             itemHistory.LastOffersAt = now;
         }
@@ -137,7 +137,7 @@ public sealed class PriceChecker
     /// <summary>Reglas de aviso: bajada respecto al último precio y precio objetivo alcanzado.</summary>
     public IEnumerable<Alert> Evaluate(WatchItem item, ItemHistory itemHistory, decimal price, PriceRecord? previous, decimal? lowestBefore, List<Offer> offers)
     {
-        var formatted = PriceParser.Format(price, item.Currency);
+        var formatted = PriceParser.Format(price, item.Currency) + (item.CompareWithShipping ? " (incl. envío)" : "");
         // Si hay ofertas, sus enlaces ya van en el cuerpo del aviso; si no, enlazamos la URL del producto.
         var bestUrl = offers.Count > 0 ? null : item.Url;
 
@@ -179,7 +179,7 @@ public sealed class PriceChecker
     {
         if (offers.Count == 0) return "";
         var lines = offers.Take(_settings.MaxOffersInAlert).Select(o =>
-            $"• {o.StoreName}{(o.PickupMadrid ? " (recogida en Madrid)" : "")}: {PriceParser.Format(o.Price, currency)} – {Truncate(o.Title, 60)}\n  {o.Url}");
+            $"• {o.StoreName}{(o.PickupMadrid ? " (recogida en Madrid)" : "")}: {PriceParser.Format(o.Price, currency)} · {o.ShippingLabel} – {Truncate(o.Title, 60)}\n  {o.Url}");
         return "\n\nMejores ofertas:\n" + string.Join("\n", lines);
     }
 

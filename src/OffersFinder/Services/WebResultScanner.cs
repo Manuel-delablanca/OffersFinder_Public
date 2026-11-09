@@ -136,7 +136,9 @@ public sealed class WebResultScanner
                 scanned.Add(new ScannedPage(result.Url, "sin precio estructurado en la página", null));
                 continue;
             }
-            var offer = new Offer(storeId, storeName, viaCss ? title + " (precio leído del texto)" : title, price.Value, result.Url, pickup);
+            var shippingCost = PriceExtractor.ExtractShippingCost(document);
+            var offer = new Offer(storeId, storeName, viaCss ? title + " (precio leído del texto)" : title, price.Value, result.Url, pickup,
+                shippingCost is null ? null : (shippingCost == 0 ? "Envío gratis" : $"Envío {PriceParser.Format(shippingCost.Value)}"), shippingCost);
             if (!OfferSearcher.Matches(item, offer))
             {
                 scanned.Add(new ScannedPage(result.Url, $"no encaja: {PriceParser.Format(price.Value, item.Currency)} \"{Truncate(title, 60)}\"", null));

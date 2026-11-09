@@ -41,6 +41,10 @@ public sealed class WatchItem
     [JsonPropertyName("pickupMadridOnly")]
     public bool PickupMadridOnly { get; set; }
 
+    /// <summary>Si es true, el precio que se compara (bajadas, objetivo, orden) incluye el envío cuando se conoce.</summary>
+    [JsonPropertyName("compareWithShipping")]
+    public bool CompareWithShipping { get; set; }
+
     /// <summary>Precio objetivo: se avisa cuando el precio sea igual o inferior.</summary>
     [JsonPropertyName("targetPrice")]
     public decimal? TargetPrice { get; set; }

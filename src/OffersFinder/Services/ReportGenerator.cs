@@ -143,11 +143,12 @@ public static class ReportGenerator
         var sb = new StringBuilder();
         var when = h.LastOffersAt is { } at ? $" ({at.ToLocalTime():dd/MM/yyyy HH:mm})" : "";
         sb.Append($"<div class=\"offers-title\">Mejores ofertas en la última comprobación{when}</div>");
-        sb.Append("<table class=\"offers\"><thead><tr><th>Precio</th><th>Tienda</th><th>Producto</th></tr></thead><tbody>");
+        sb.Append("<table class=\"offers\"><thead><tr><th>Precio</th><th>Envío</th><th>Tienda</th><th>Producto</th></tr></thead><tbody>");
         for (var i = 0; i < offers.Count; i++)
         {
             var o = offers[i];
-            sb.Append($"<tr{(i == 0 ? " class=\"best\"" : "")}><td class=\"price\">{PriceParser.Format(o.Price, item.Currency)}</td>");
+            var shipping = o.ShippingCost switch { 0m => "gratis", { } cost => PriceParser.Format(cost, item.Currency), null when !string.IsNullOrWhiteSpace(o.Shipping) => o.Shipping!.Trim(), _ => "—" };
+            sb.Append($"<tr{(i == 0 ? " class=\"best\"" : "")}><td class=\"price\">{PriceParser.Format(o.Price, item.Currency)}</td><td>{E(shipping)}</td>");
             sb.Append($"<td>{E(o.Store)}{(o.PickupMadrid ? " <span class=\"tag\">recogida en Madrid</span>" : "")}</td>");
             sb.Append($"<td><a href=\"{E(o.Url)}\">{E(o.Title)}</a></td></tr>");
         }

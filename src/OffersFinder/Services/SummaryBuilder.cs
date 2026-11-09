@@ -46,15 +46,15 @@ public static class SummaryBuilder
             var stores = (h?.StoreRecords ?? new List<StoreRecord>())
                 .Where(r => r.Timestamp >= since)
                 .GroupBy(r => r.Store)
-                .Select(g => (Store: g.Key, Price: g.OrderByDescending(r => r.Timestamp).First().Price))
-                .OrderBy(x => x.Price)
+                .Select(g => g.OrderByDescending(r => r.Timestamp).First())
+                .OrderBy(r => r.Price)
                 .Take(6)
                 .ToList();
             if (stores.Count > 0)
             {
-                lines.Add("   Tiendas:");
-                foreach (var (store, price) in stores)
-                    lines.Add($"   • {store}: {PriceParser.Format(price, c)}");
+                lines.Add(item.CompareWithShipping ? "   Tiendas (precio con envío):" : "   Tiendas:");
+                foreach (var r in stores)
+                    lines.Add($"   • {r.Store}: {PriceParser.Format(r.Price, c)} · {ShippingLabel(r)}");
             }
             blocks.Add(string.Join("\n", lines));
         }
@@ -62,4 +62,12 @@ public static class SummaryBuilder
         if (blocks.Count == 0) blocks.Add("No hay productos en la lista.");
         return string.Join("\n\n", blocks);
     }
+
+    private static string ShippingLabel(StoreRecord r) => r.ShippingCost switch
+    {
+        0m => "envío gratis",
+        { } cost => $"envío {PriceParser.Format(cost)}",
+        null when !string.IsNullOrWhiteSpace(r.Shipping) => r.Shipping!.Trim(),
+        _ => "envío no indicado",
+    };
 }

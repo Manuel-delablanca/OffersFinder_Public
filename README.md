@@ -12,6 +12,7 @@ Aplicación de consola en **.NET 10** que vigila los precios de los productos qu
 - **Histórico y estadísticas**: `history` muestra mínimo, máximo, media, mediana y variación, con filtro `--month AAAA-MM`, y el último precio y mínimo de cada tienda. Se guarda el precio de cada tienda en cada consulta, no solo el mejor.
 - **Resumen diario e informe semanal**: tras cada comprobación llega por Telegram el estado de cada producto (precio, variación, mínimo, objetivo y precio por tienda) aunque no haya bajadas; cada lunes (variable `REPORT_DAY`) llegan además la gráfica de cada producto como imagen y el informe HTML completo.
 - **Emparejado tolerante**: "2 TB" y "2tb", "MX-12" y "mx 12" o acentos y mayúsculas se consideran iguales; `mustContain` y `exclude` admiten sinónimos con `|` ("2tb|2000gb").
+- **Gastos de envío**: Google Shopping indica el envío de cada oferta ("Envío gratis", "Envío 4,99 €"); se muestra en avisos, resumen e informe y, con `compareWithShipping`, se suma al precio para comparar. Las fichas leídas directamente solo lo aportan si lo declaran en sus datos estructurados.
 - **Sin stock**: las fichas que declaran el producto agotado (schema.org, metaetiquetas o el texto de stock) se descartan.
 - **Informe con gráficas**: `report` genera `data/report.html`, un HTML estático sin JavaScript (se ve en cualquier visor, móvil incluido) con una gráfica SVG por producto (mejor precio, una línea por tienda y objetivo), estadísticas, pestañas por mes, tabla por tienda y tabla de mejores ofertas.
 - **Avisos destacados**: el aviso de precio objetivo alcanzado se fija en el chat de Telegram para que quede arriba del todo.
@@ -89,6 +90,7 @@ O editando `watchlist.json` directamente:
 | `minPrice` / `maxPrice` | Rango plausible: evita que un accesorio barato o un pack caro se cuele como "mejor oferta". |
 | `targetPrice` | Avisa cuando el precio sea igual o inferior. Se vuelve a avisar solo si baja más o si subió y volvió a bajar. |
 | `pickupMadridOnly` | Solo tiendas con recogida en la Comunidad de Madrid. |
+| `compareWithShipping` | Comparar, ordenar y medir el objetivo con el precio **más el envío** cuando se conoce. Por defecto `false`: se compara el precio del producto y el envío se muestra a título informativo. |
 | `stores` | Limita la búsqueda a esos identificadores de tienda. |
 | `excludeStores` | Lista negra de tiendas **para este producto**. |
 | `selector` | Selector CSS del precio en la página de `url` (si la detección automática falla). |

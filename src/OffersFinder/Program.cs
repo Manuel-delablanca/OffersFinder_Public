@@ -160,7 +160,7 @@ public static class Program
         var query = OptionValue(args, "--query");
         if (url is null && query is null)
         {
-            Console.Error.WriteLine("Uso: add [URL] [--query \"texto\"] [--name \"Nombre\"] [--target 199.99] [--max 400] [--min 50] [--selector \".price\"] [--exclude funda,cable] [--stores amazon_es,pccomponentes] [--exclude-stores amazon_es] [--pickup-madrid] [--urls url1,url2]");
+            Console.Error.WriteLine("Uso: add [URL] [--query \"texto\"] [--name \"Nombre\"] [--target 199.99] [--max 400] [--min 50] [--selector \".price\"] [--exclude funda,cable] [--stores amazon_es,pccomponentes] [--exclude-stores amazon_es] [--pickup-madrid] [--with-shipping] [--urls url1,url2]");
             return 2;
         }
 
@@ -180,6 +180,7 @@ public static class Program
             Stores = SplitList(OptionValue(args, "--stores")),
             ExcludeStores = SplitList(OptionValue(args, "--exclude-stores")),
             PickupMadridOnly = args.Contains("--pickup-madrid"),
+            CompareWithShipping = args.Contains("--with-shipping"),
         };
 
         if (watchlist.Items.Any(i => i.Key == item.Key))
