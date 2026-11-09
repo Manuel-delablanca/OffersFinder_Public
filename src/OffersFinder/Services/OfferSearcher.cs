@@ -88,6 +88,10 @@ public sealed class OfferSearcher
             string.Equals(StripWww(storeUri.Host), host, StringComparison.OrdinalIgnoreCase));
     }
 
+    public bool IsBlacklistedId(string storeId, WatchItem item) =>
+        _globalBlacklist.Contains(storeId, StringComparer.OrdinalIgnoreCase) ||
+        (item.ExcludeStores?.Contains(storeId, StringComparer.OrdinalIgnoreCase) ?? false);
+
     public bool IsBlacklisted(Store store, WatchItem item) =>
         _globalBlacklist.Contains(store.Id, StringComparer.OrdinalIgnoreCase) ||
         (item.ExcludeStores?.Contains(store.Id, StringComparer.OrdinalIgnoreCase) ?? false);

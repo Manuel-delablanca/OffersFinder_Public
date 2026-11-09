@@ -288,6 +288,8 @@ public static class Program
             if (item.HasUrl) Console.WriteLine($"   URL: {item.Url}");
             if (item.HasQuery) Console.WriteLine($"   Búsqueda: \"{item.Query}\"{(item.PickupMadridOnly ? " (solo recogida en Madrid)" : "")}");
             if (item.ExcludeStores is { Count: > 0 }) Console.WriteLine($"   Tiendas excluidas: {string.Join(", ", item.ExcludeStores)}");
+            if (h?.LearnedUrls is { Count: > 0 } learned)
+                Console.WriteLine($"   Fichas aprendidas de la API ({learned.Count}): {string.Join(", ", learned.OrderBy(l => l.LastPrice).Take(5).Select(l => $"{l.Store} {PriceParser.Format(l.LastPrice, item.Currency)}"))}");
             Console.WriteLine($"   Último: {lastText}{lowest}{target}");
         }
         return 0;

@@ -83,7 +83,7 @@ O editando `watchlist.json` directamente:
 | Campo | Significado |
 |---|---|
 | `url` | Página concreta del producto. Si la tienda está en la lista negra, se omite. |
-| `urls` | Más fichas de producto (en distintas tiendas) que se leen directamente. No gastan consultas de la API. |
+| `urls` | Más fichas de producto (en distintas tiendas) que se leen directamente. No gastan consultas de la API. Además, el programa **aprende solo** las fichas con enlace directo que encuentra la API y las lee a diario; las que fallan tres veces seguidas o dejan de corresponder al producto se descartan. |
 | `query` | Texto a buscar en el catálogo de tiendas. Puede combinarse con `url`; se usa el precio más bajo de ambos. |
 | `mustContain` | Palabras que deben aparecer en el título del resultado (si falta, se usan las de `query`). |
 | `exclude` | Palabras que descartan un resultado (accesorios, otras capacidades...). |

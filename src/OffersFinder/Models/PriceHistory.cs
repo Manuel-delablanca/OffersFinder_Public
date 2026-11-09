@@ -38,6 +38,10 @@ public sealed class ItemHistory
     [JsonPropertyName("storeRecords")]
     public List<StoreRecord>? StoreRecords { get; set; }
 
+    /// <summary>Fichas de producto en tiendas descubiertas por la API; se leen a diario sin gastar consultas.</summary>
+    [JsonPropertyName("learnedUrls")]
+    public List<LearnedUrl>? LearnedUrls { get; set; }
+
     /// <summary>Última vez que este producto se buscó en la API (Google Shopping / web). Null = nunca.</summary>
     [JsonPropertyName("lastApiSearchAt")]
     public DateTimeOffset? LastApiSearchAt { get; set; }
@@ -99,4 +103,26 @@ public sealed class StoreRecord
 
     [JsonPropertyName("shippingCost")]
     public decimal? ShippingCost { get; set; }
+}
+
+public sealed class LearnedUrl
+{
+    [JsonPropertyName("url")]
+    public string Url { get; set; } = "";
+
+    [JsonPropertyName("store")]
+    public string Store { get; set; } = "";
+
+    [JsonPropertyName("firstSeen")]
+    public DateTimeOffset FirstSeen { get; set; }
+
+    [JsonPropertyName("lastSeen")]
+    public DateTimeOffset LastSeen { get; set; }
+
+    [JsonPropertyName("lastPrice")]
+    public decimal LastPrice { get; set; }
+
+    /// <summary>Fallos consecutivos al leer la ficha; a partir de 3 se descarta.</summary>
+    [JsonPropertyName("failures")]
+    public int Failures { get; set; }
 }

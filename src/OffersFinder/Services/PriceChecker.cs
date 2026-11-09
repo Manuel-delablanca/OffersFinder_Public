@@ -36,15 +36,25 @@ public sealed class PriceChecker
             history[item.Key] = itemHistory = new ItemHistory();
         itemHistory.Name = item.DisplayName;
 
-        // 1) Fichas de producto concretas (no gastan consultas de la API)
-        foreach (var url in item.AllUrls)
+        // 1) Fichas de producto concretas (no gastan consultas de la API): las del usuario y las aprendidas de la API
+        var manualUrls = item.AllUrls.ToList();
+        var learned = (itemHistory.LearnedUrls ?? new List<LearnedUrl>())
+            .Where(l => !manualUrls.Contains(l.Url, StringComparer.OrdinalIgnoreCase))
+            .OrderBy(l => l.LastPrice)
+            .Take(MaxLearnedUrls)
+            .ToList();
+        if (learned.Count > 0) _log($"  · {learned.Count} ficha(s) aprendida(s) de la API");
+        foreach (var url in manualUrls.Concat(learned.Select(l => l.Url)))
         {
+            var learnedEntry = learned.FirstOrDefault(l => string.Equals(l.Url, url, StringComparison.OrdinalIgnoreCase));
             var urlStore = _searcher.StoreForUrl(url);
             if (urlStore is not null && _searcher.IsBlacklisted(urlStore, item))
             {
                 _log($"  · {urlStore.Name} está en la lista negra: se omite {url}");
                 continue;
             }
+            if (learnedEntry is not null && IsBlacklistedName(learnedEntry.Store, item))
+                continue;
             try
             {
                 var html = await _fetcher.GetHtmlAsync(url, item.Headers, ct);
@@ -63,15 +73,33 @@ public sealed class PriceChecker
                     continue;
                 }
                 var host = HostOf(url);
-                var offer = new Offer(urlStore?.Id ?? Store.Normalize(host.Split('.')[0]), urlStore?.Name ?? host,
+                var storeName = urlStore?.Name ?? learnedEntry?.Store ?? host;
+                var offer = new Offer(urlStore?.Id ?? Store.Normalize(storeName), storeName,
                     PriceExtractor.ProductName(document) ?? item.DisplayName, found.Value, url, urlStore?.PickupMadrid ?? false);
+                // Las fichas aprendidas deben seguir siendo el producto buscado (la tienda puede reutilizar la URL).
+                if (learnedEntry is not null && !OfferSearcher.Matches(item, offer))
+                {
+                    _log($"  · {storeName}: la ficha ya no encaja con el producto ({PriceParser.Format(found.Value, item.Currency)}), se descarta");
+                    itemHistory.LearnedUrls!.Remove(learnedEntry);
+                    continue;
+                }
                 offers.Add(offer);
-                _log($"  · {host}: {PriceParser.Format(found.Value, item.Currency)}");
+                if (learnedEntry is not null) { learnedEntry.Failures = 0; learnedEntry.LastSeen = now; learnedEntry.LastPrice = found.Value; }
+                _log($"  · {storeName}: {PriceParser.Format(found.Value, item.Currency)}");
             }
             catch (FetchException ex)
             {
                 _log($"  · {HostOf(url)}: {ex.Message}");
-                error ??= ex.Message;
+                if (learnedEntry is not null)
+                {
+                    learnedEntry.Failures++;
+                    if (learnedEntry.Failures >= 3)
+                    {
+                        itemHistory.LearnedUrls!.Remove(learnedEntry);
+                        _log($"  · ficha de {learnedEntry.Store} descartada tras 3 fallos");
+                    }
+                }
+                else error ??= ex.Message;
             }
         }
 
@@ -81,8 +109,13 @@ public sealed class PriceChecker
         if (item.HasQuery && (!_settings.ApiPaused || firstApiSearch))
         {
             if (_settings.ApiPaused) _log("  ▶ primera búsqueda de este producto: se consulta la API aunque esté en pausa");
-            offers.AddRange(await _searcher.SearchAsync(item, ct));
-            if (_searcher.UsesApi) itemHistory.LastApiSearchAt = now;
+            var found = await _searcher.SearchAsync(item, ct);
+            offers.AddRange(found);
+            if (_searcher.UsesApi)
+            {
+                itemHistory.LastApiSearchAt = now;
+                LearnUrls(itemHistory, found, now);
+            }
         }
         else if (item.HasQuery && item.AllUrls.Any() == false)
             error ??= $"API en pausa hasta {_settings.ApiPauseUntil:yyyy-MM-dd} y el producto no tiene URL que leer.";
@@ -177,6 +210,34 @@ public sealed class PriceChecker
             // Volvió a subir por encima del objetivo: la próxima vez que baje, avisamos de nuevo.
             itemHistory.LastTargetAlertPrice = null;
         }
+    }
+
+    private const int MaxLearnedUrls = 10;
+
+    /// <summary>Guarda las fichas con enlace directo a la tienda encontradas por la API para leerlas a diario sin consultas.</summary>
+    public static void LearnUrls(ItemHistory itemHistory, IEnumerable<Offer> found, DateTimeOffset now)
+    {
+        itemHistory.LearnedUrls ??= new List<LearnedUrl>();
+        foreach (var offer in found)
+        {
+            if (!Uri.TryCreate(offer.Url, UriKind.Absolute, out var uri)) continue;
+            var host = uri.Host.StartsWith("www.") ? uri.Host[4..] : uri.Host;
+            if (host.EndsWith("google.com") || host.EndsWith("google.es")) continue; // enlace a la ficha de Google, no a la tienda
+            var existing = itemHistory.LearnedUrls.FirstOrDefault(l => string.Equals(l.Url, offer.Url, StringComparison.OrdinalIgnoreCase));
+            if (existing is null)
+                itemHistory.LearnedUrls.Add(new LearnedUrl { Url = offer.Url, Store = offer.StoreName, FirstSeen = now, LastSeen = now, LastPrice = offer.Price });
+            else { existing.LastSeen = now; existing.LastPrice = offer.Price; existing.Store = offer.StoreName; }
+        }
+        // Se conservan las más baratas vistas recientemente.
+        if (itemHistory.LearnedUrls.Count > MaxLearnedUrls * 2)
+            itemHistory.LearnedUrls = itemHistory.LearnedUrls.OrderByDescending(l => l.LastSeen).ThenBy(l => l.LastPrice).Take(MaxLearnedUrls * 2).ToList();
+    }
+
+    private bool IsBlacklistedName(string storeName, WatchItem item)
+    {
+        var id = Store.Normalize(storeName);
+        var store = _searcher.StoreForName(storeName);
+        return (store is not null && _searcher.IsBlacklisted(store, item)) || _searcher.IsBlacklistedId(id, item);
     }
 
     private static string HostOf(string url) =>
