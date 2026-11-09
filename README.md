@@ -104,6 +104,7 @@ O editando `watchlist.json` directamente:
 | `check` | Comprueba todos los productos, guarda el histórico, regenera el informe y envía avisos. |
 | `check --loop --every 6h` | Lo mismo, repitiendo cada intervalo (`30m`, `6h`, `1d`). |
 | `check --only casco,3` | Comprueba solo los productos cuyo nombre contenga "casco" o tengan el número 3. En GitHub, la casilla **only_items** del flujo manual. |
+| `check --notify-result` | Envía además un mensaje con el resultado de cada producto aunque no haya bajadas. Las ejecuciones manuales del flujo lo hacen siempre. |
 | `check --dry-run` | Comprueba sin guardar ni enviar avisos externos. |
 | `list` | Lista los productos con último precio, mínimo y objetivo. |
 | `history [nombre] [--month 2026-11] [--all]` | Histórico con mínimo, máximo, media, mediana y variación. |
@@ -199,7 +200,7 @@ La programación (cada día a las 9:05 hora de España), el catálogo de tiendas
 
 ### Opción A: GitHub Actions (sin servidor propio)
 
-El flujo `.github/workflows/check-prices.yml` ejecuta la comprobación **una vez al día, a las 9:05 hora de España** (se dispara a las 7:05 y 8:05 UTC y solo actúa cuando en Madrid son las 9, para cubrir el cambio de horario), y guarda `data/history.json` y `data/report.html` en el repositorio, de modo que el histórico y el informe se acumulan entre ejecuciones.
+El flujo `.github/workflows/check-prices.yml` ejecuta la comprobación **una vez al día, a partir de las 9 hora de España**. GitHub lanza las tareas programadas con retraso variable (a veces de horas), así que el flujo tiene varios disparos repartidos por la mañana y la tarde y ejecuta la comprobación en el primero que llega cada día, guardando la fecha en `data/last-run.txt` para omitir los demás. Guarda `data/history.json` y `data/report.html` en el repositorio, de modo que el histórico y el informe se acumulan entre ejecuciones.
 
 1. Sube el repositorio a GitHub.
 2. En *Settings → Secrets and variables → Actions → New repository secret* crea los secretos `SERPER_API_KEY` (o `SERPAPI_API_KEY`) para la fuente de precios, `TELEGRAM_BOT_TOKEN` (token del bot) y `TELEGRAM_CHAT_ID` (tu chat). Opcionalmente, los secretos de email (`SMTP_*`, `EMAIL_TO`) o WhatsApp, y las variables `MIN_DROP_PERCENT`, `API_PAUSE_UNTIL` o `REMINDER_DATE`.

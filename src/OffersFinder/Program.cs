@@ -50,6 +50,7 @@ public static class Program
         var loop = args.Contains("--loop");
         var every = ParseInterval(OptionValue(args, "--every")) ?? TimeSpan.FromHours(6);
         var dryRun = args.Contains("--dry-run");
+        var notifyResult = args.Contains("--notify-result");
         if (OptionValue(args, "--only") is { } only)
             settings = settings with { OnlyItems = only.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) };
 
@@ -58,7 +59,7 @@ public static class Program
 
         do
         {
-            await RunOnceAsync(settings, dryRun, cts.Token);
+            await RunOnceAsync(settings, dryRun, notifyResult, cts.Token);
             if (loop)
             {
                 Console.WriteLine($"Próxima comprobación en {every} ({DateTime.Now.Add(every):g}). Ctrl+C para salir.");
@@ -69,7 +70,7 @@ public static class Program
         return 0;
     }
 
-    private static async Task RunOnceAsync(Settings settings, bool dryRun, CancellationToken ct)
+    private static async Task RunOnceAsync(Settings settings, bool dryRun, bool notifyResult, CancellationToken ct)
     {
         var watchlist = new WatchlistStore(settings.WatchlistPath).Load();
         if (watchlist.Items.Count == 0)
@@ -108,11 +109,13 @@ public static class Program
         var checker = new PriceChecker(settings, fetcher, searcher, Console.WriteLine);
 
         var alerts = new List<Alert>();
+        var results = new List<CheckResult>();
         foreach (var item in itemsToCheck)
         {
             ct.ThrowIfCancellationRequested();
             Console.WriteLine($"→ {item.DisplayName}");
             var result = await checker.CheckAsync(item, history, now, ct);
+            results.Add(result);
 
             if (result.Price is null)
             {
@@ -124,6 +127,10 @@ public static class Program
             Console.WriteLine($"  {PriceParser.Format(result.Price.Value, item.Currency)} ({previousText}, {result.Offers.Count} oferta(s))");
             alerts.AddRange(result.Alerts);
         }
+
+        // En ejecuciones manuales se añade un mensaje con el resultado de cada producto comprobado.
+        if (notifyResult)
+            alerts.Add(new Alert($"📋 Resultado de la comprobación ({results.Count} producto{(results.Count == 1 ? "" : "s")})", ResultSummary(results, settings), null));
 
         // Los avisos se envían al final, agrupados: el email manda un solo correo por ejecución.
         if (alerts.Count > 0)
@@ -161,6 +168,29 @@ public static class Program
             ? new WebResultScanner(fetcher, stores, watchlist.BlacklistedStores, settings.WebSearchMaxPages)
             : null;
         return new OfferSearcher(fetcher, stores, watchlist.BlacklistedStores, Console.WriteLine, shopping, settings.UseStoreSearch, scanner);
+    }
+
+    /// <summary>Texto con el resultado de cada producto comprobado (precio, tienda, envío, nº de ofertas o el motivo de no tener precio).</summary>
+    public static string ResultSummary(IReadOnlyList<CheckResult> results, Settings settings)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var r in results)
+        {
+            sb.AppendLine($"🛒 {r.Item.DisplayName}");
+            if (r.Price is null)
+            {
+                sb.AppendLine($"   Sin precio: {r.Error}");
+                continue;
+            }
+            var best = r.Offers.FirstOrDefault();
+            var previous = r.Previous is null ? "primera vez" : $"antes {PriceParser.Format(r.Previous.Price, r.Item.Currency)}";
+            sb.AppendLine($"   {PriceParser.Format(r.Price.Value, r.Item.Currency)}{(best is null ? "" : $" en {best.StoreName} · {best.ShippingLabel}")} ({previous})");
+            foreach (var o in r.Offers.Skip(1).Take(Math.Max(0, settings.MaxOffersInAlert - 1)))
+                sb.AppendLine($"   • {o.StoreName}: {PriceParser.Format(o.Price, r.Item.Currency)} · {o.ShippingLabel}");
+            if (r.Offers.Count > settings.MaxOffersInAlert)
+                sb.AppendLine($"   … y {r.Offers.Count - settings.MaxOffersInAlert} oferta(s) más");
+        }
+        return sb.ToString().TrimEnd();
     }
 
     private static int Add(Settings settings, string[] args)
@@ -589,8 +619,9 @@ public static class Program
             OffersFinder – vigila precios y avisa cuando bajan.
 
             Comandos:
-              check [--only a,b] [--loop] [--every 6h] [--dry-run]
+              check [--only a,b] [--notify-result] [--loop] [--every 6h] [--dry-run]
                                                          Comprueba los productos (todos, o solo los que contengan a/b o tengan ese número).
+                                                         --notify-result envía además un mensaje con el resultado aunque no haya bajadas.
               add URL | --query "texto" [opciones]       Añade un producto a la lista.
                   --name "Nombre"  --target 199.99  --max 400  --min 50  --selector ".price"
                   --exclude funda,cable  --stores amazon_es,pccomponentes  --pickup-madrid

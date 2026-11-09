@@ -2,11 +2,15 @@ name: Comprobar precios
 
 on:
   schedule:
-    # Una vez al día a las 09:05 hora de España. GitHub programa en UTC y España cambia de horario
-    # en verano, así que se dispara a las 07:05 y 08:05 UTC y el paso "Comprobar hora local" deja
-    # pasar solo el disparo en el que en Madrid son las 9.
-    - cron: "5 7 * * *"
-    - cron: "5 8 * * *"
+    # Una vez al día, a partir de las 9 hora de España. GitHub dispara las tareas programadas con retraso
+    # (a veces de horas), así que hay varios disparos repartidos y el paso "Comprobar hora local" ejecuta
+    # la comprobación en el primero que llega cada día (data/last-run.txt guarda la fecha) y omite el resto.
+    - cron: "17 8 * * *"
+    - cron: "47 8 * * *"
+    - cron: "17 9 * * *"
+    - cron: "17 10 * * *"
+    - cron: "17 12 * * *"
+    - cron: "17 15 * * *"
   workflow_dispatch:
     inputs:
       debug:
@@ -71,25 +75,29 @@ jobs:
       WEB_SEARCH: ${{ vars.WEB_SEARCH }}
       DEBUG_DIR: ${{ inputs.debug && 'debug-html' || '' }}
     steps:
+      - uses: actions/checkout@v4
+
       - name: Comprobar hora local
         id: hora
         run: |
-          hora=$(TZ=Europe/Madrid date +%H)
-          echo "fecha=$(TZ=Europe/Madrid date +%F)" >> "$GITHUB_OUTPUT"
+          hora=$(TZ=Europe/Madrid date +%H:%M)
+          hoy=$(TZ=Europe/Madrid date +%F)
+          ultima=$(cat data/last-run.txt 2>/dev/null || echo "nunca")
+          echo "fecha=$hoy" >> "$GITHUB_OUTPUT"
           echo "dia=$(TZ=Europe/Madrid date +%u)" >> "$GITHUB_OUTPUT"
           if [ -z "${SERPAPI_API_KEY}${SERPER_API_KEY}${TELEGRAM_BOT_TOKEN}" ]; then
             echo "run=false" >> "$GITHUB_OUTPUT"
             echo "Este repositorio aún no está configurado: crea los secretos SERPAPI_API_KEY (o SERPER_API_KEY), TELEGRAM_BOT_TOKEN y TELEGRAM_CHAT_ID. Consulta el README, sección 'Instalar tu propia copia'."
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$hora" = "09" ]; then
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
-            echo "Hora en Madrid: ${hora}:$(TZ=Europe/Madrid date +%M). Se ejecuta la comprobación."
-          else
+            echo "Ejecución manual a las $hora (Madrid)."
+          elif [ "$ultima" = "$hoy" ]; then
             echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "Hora en Madrid: ${hora}:$(TZ=Europe/Madrid date +%M). No son las 9; este disparo se omite."
+            echo "Son las $hora en Madrid y la comprobación de hoy ($hoy) ya se hizo; este disparo se omite."
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "Son las $hora en Madrid; primera ejecución del día $hoy (última: $ultima)."
           fi
-
-      - uses: actions/checkout@v4
-        if: steps.hora.outputs.run == 'true'
 
       - uses: actions/setup-dotnet@v4
         if: steps.hora.outputs.run == 'true'
@@ -102,7 +110,8 @@ jobs:
 
       - name: Comprobar precios
         if: ${{ !inputs.test_notify && steps.hora.outputs.run == 'true' }}
-        run: dotnet run --project src/OffersFinder -c Release -- check
+        # En las ejecuciones manuales se envía un mensaje con el resultado aunque no haya bajadas.
+        run: dotnet run --project src/OffersFinder -c Release -- check ${{ github.event_name == 'workflow_dispatch' && '--notify-result' || '' }}
 
       - name: Diagnóstico de tiendas
         if: ${{ inputs.debug && !inputs.test_notify && steps.hora.outputs.run == 'true' }}
@@ -143,7 +152,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/history.json data/report.html
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "${{ inputs.test_notify }}" != "true" ]; then
+            echo "${{ steps.hora.outputs.fecha }}" > data/last-run.txt
+          fi
+          git add data/history.json data/report.html data/last-run.txt
           if git diff --cached --quiet; then
             echo "Sin cambios en el histórico."
           else
