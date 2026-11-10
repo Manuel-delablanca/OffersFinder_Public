@@ -33,6 +33,10 @@ on:
         description: "Comprobar solo estos productos (textos del nombre o números, separados por comas). Vacío = todos"
         type: string
         default: ""
+      scheduled:
+        description: "Tratar esta ejecución como la programada del día (resumen diario, una vez al día). La usa el disparador externo"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -85,10 +89,13 @@ jobs:
           ultima=$(cat data/last-run.txt 2>/dev/null || echo "nunca")
           echo "fecha=$hoy" >> "$GITHUB_OUTPUT"
           echo "dia=$(TZ=Europe/Madrid date +%u)" >> "$GITHUB_OUTPUT"
+          # "Programada": el cron de GitHub o una ejecución manual lanzada con la casilla 'scheduled' (disparador externo).
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.scheduled }}" = "true" ]; then scheduled=true; else scheduled=false; fi
+          echo "scheduled=$scheduled" >> "$GITHUB_OUTPUT"
           if [ -z "${SERPAPI_API_KEY}${SERPER_API_KEY}${TELEGRAM_BOT_TOKEN}" ]; then
             echo "run=false" >> "$GITHUB_OUTPUT"
             echo "Este repositorio aún no está configurado: crea los secretos SERPAPI_API_KEY (o SERPER_API_KEY), TELEGRAM_BOT_TOKEN y TELEGRAM_CHAT_ID. Consulta el README, sección 'Instalar tu propia copia'."
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          elif [ "$scheduled" = "false" ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
             echo "Ejecución manual a las $hora (Madrid)."
           elif [ "$ultima" = "$hoy" ]; then
@@ -111,7 +118,7 @@ jobs:
       - name: Comprobar precios
         if: ${{ !inputs.test_notify && steps.hora.outputs.run == 'true' }}
         # En las ejecuciones manuales se envía un mensaje con el resultado aunque no haya bajadas.
-        run: dotnet run --project src/OffersFinder -c Release -- check ${{ github.event_name == 'workflow_dispatch' && '--notify-result' || '' }}
+        run: dotnet run --project src/OffersFinder -c Release -- check ${{ steps.hora.outputs.scheduled != 'true' && '--notify-result' || '' }}
 
       - name: Diagnóstico de tiendas
         if: ${{ inputs.debug && !inputs.test_notify && steps.hora.outputs.run == 'true' }}
@@ -129,20 +136,20 @@ jobs:
       - name: Resumen diario con gráficas
         # Tras cada comprobación programada (o con la casilla send_report): texto y una imagen por producto.
         # La variable SUMMARY_DAILY=false lo desactiva.
-        if: ${{ !inputs.test_notify && steps.hora.outputs.run == 'true' && vars.SUMMARY_DAILY != 'false' && (inputs.send_report || github.event_name == 'schedule') }}
+        if: ${{ !inputs.test_notify && steps.hora.outputs.run == 'true' && vars.SUMMARY_DAILY != 'false' && (inputs.send_report || steps.hora.outputs.scheduled == 'true') }}
         run: |
           dotnet run --project src/OffersFinder -c Release --no-build -- summary --days 7
           dotnet run --project src/OffersFinder -c Release --no-build -- send-report --images-only
 
       - name: Informe semanal (archivo HTML)
         # Día de la semana (1 = lunes ... 7 = domingo) en la variable de repositorio REPORT_DAY; 'none' lo desactiva.
-        if: ${{ !inputs.test_notify && steps.hora.outputs.run == 'true' && (inputs.send_report || (github.event_name == 'schedule' && steps.hora.outputs.dia == (vars.REPORT_DAY || '1'))) }}
+        if: ${{ !inputs.test_notify && steps.hora.outputs.run == 'true' && (inputs.send_report || (steps.hora.outputs.scheduled == 'true' && steps.hora.outputs.dia == (vars.REPORT_DAY || '1'))) }}
         run: dotnet run --project src/OffersFinder -c Release --no-build -- send-report --file-only
 
       - name: Recordatorio programado
         # Se envía una sola vez, en la ejecución programada del día indicado en la variable de repositorio
         # REMINDER_DATE (AAAA-MM-DD). Sin esa variable no se envía nada.
-        if: ${{ github.event_name == 'schedule' && steps.hora.outputs.run == 'true' && vars.REMINDER_DATE != '' && steps.hora.outputs.fecha == vars.REMINDER_DATE }}
+        if: ${{ steps.hora.outputs.scheduled == 'true' && steps.hora.outputs.run == 'true' && vars.REMINDER_DATE != '' && steps.hora.outputs.fecha == vars.REMINDER_DATE }}
         run: >
           dotnet run --project src/OffersFinder -c Release --no-build -- notify
           "⏰ Recordatorio de OffersFinder"
@@ -155,7 +162,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          if [ "${{ github.event_name }}" = "schedule" ] && [ "${{ inputs.test_notify }}" != "true" ]; then
+          if [ "${{ steps.hora.outputs.scheduled }}" = "true" ] && [ "${{ inputs.test_notify }}" != "true" ]; then
             echo "${{ steps.hora.outputs.fecha }}" > data/last-run.txt
           fi
           git add data/history.json data/report.html
